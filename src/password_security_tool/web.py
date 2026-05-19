@@ -1,128 +1,158 @@
-from flask import Flask, redirect, render_template_string, request, url_for
+import os
+from functools import wraps
+from typing import Any, Dict
+
+from flask import (
+    Flask,
+    flash,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 
 from .core import (
+    ROLE_ADMIN,
+    ROLE_USER,
+    UserManager,
     calculate_entropy,
     complexity_score,
     detect_patterns,
     estimate_crack_time,
     generate_password,
-    hash_password,
     pwned_passwords_count,
     strength_meter,
     suggest_improvements,
 )
 
-HTML_TEMPLATE = """
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>Password Security Tool</title>
-    <style>
-      body { font-family: Arial, sans-serif; margin: 2rem; }
-      input, button, select { font-size: 1rem; margin: 0.25rem 0; }
-      .card { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
-      .result { background: #f9f9f9; padding: 1rem; border-radius: 8px; margin-top: 1rem; }
-    </style>
-  </head>
-  <body>
-    <h1>Password Security Tool</h1>
-    <div class="card">
-      <h2>Analyze Password</h2>
-      <form method="post" action="{{ url_for('analyze') }}">
-        <label>Password</label><br />
-        <input type="password" name="password" value="{{ password or '' }}" required /><br />
-        <button type="submit">Analyze</button>
-      </form>
-    </div>
-
-    <div class="card">
-      <h2>Generate Password</h2>
-      <form method="post" action="{{ url_for('generate') }}">
-        <label>Length</label><br />
-        <input type="number" name="length" value="16" min="8" max="64" /><br />
-        <button type="submit">Generate</button>
-      </form>
-      {% if generated_password %}
-      <div class="result">
-        <strong>Generated:</strong> <code>{{ generated_password }}</code>
-      </div>
-      {% endif %}
-    </div>
-
-    {% if analysis %}
-    <div class="card">
-      <h2>Analysis Results</h2>
-      <div class="result">
-        <p><strong>Score:</strong> {{ analysis.score }}/100</p>
-        <p><strong>Strength:</strong> {{ analysis.strength }}</p>
-        <p><strong>Entropy:</strong> {{ analysis.entropy }} bits</p>
-        <p><strong>Estimated crack time:</strong> {{ analysis.crack_time }} {{ analysis.crack_unit }}</p>
-        <p><strong>Patterns:</strong> {{ analysis.patterns or 'None' }}</p>
-        <p><strong>Suggestions:</strong></p>
-        <ul>{% for suggestion in analysis.suggestions %}<li>{{ suggestion }}</li>{% endfor %}</ul>
-      </div>
-    </div>
-    {% endif %}
-
-    {% if breach_count is not none %}
-    <div class="card">
-      <h2>Breach Check</h2>
-      <div class="result">
-        {% if breach_count > 0 %}
-          <p>This password appears in breaches <strong>{{ breach_count }}</strong> times.</p>
-        {% else %}
-          <p>No breach matches found.</p>
-        {% endif %}
-      </div>
-    </div>
-    {% endif %}
-
-  </body>
-</html>
-"""
-
 
 def create_app() -> Flask:
-    app = Flask(__name__)
+    app = Flask(__name__, template_folder="templates", static_folder="static")
+    app.secret_key = os.environ.get("SECRET_KEY", "dev-password-tool-secret")
 
-    @app.route("/", methods=["GET"])
-    def index() -> str:
-        return render_template_string(HTML_TEMPLATE, password="", analysis=None, generated_password=None, breach_count=None)
+    manager = UserManager()
+    # Seed a demo admin account for quick login.
+    if not manager.get_user("admin"):
+        manager.register_user("admin", "Admin123!", role=ROLE_ADMIN)
 
-    @app.route("/analyze", methods=["POST"])
-    def analyze() -> str:
-        password = request.form["password"]
+    def current_user() -> str | None:
+        return session.get("username")
+
+    def login_required(view):
+        @wraps(view)
+        def wrapped(*args: Any, **kwargs: Any):
+            if not current_user():
+                flash("Please log in to continue.", "warning")
+                return redirect(url_for("login"))
+            return view(*args, **kwargs)
+
+        return wrapped
+
+    def build_analysis(password: str) -> Dict[str, Any]:
         score = complexity_score(password)
-        analysis = {
+        crack_time, crack_unit = estimate_crack_time(password)
+        return {
             "score": score,
             "strength": strength_meter(score),
             "entropy": calculate_entropy(password),
             "patterns": detect_patterns(password),
             "suggestions": suggest_improvements(password),
-            "crack_time": estimate_crack_time(password)[0],
-            "crack_unit": estimate_crack_time(password)[1],
+            "crack_time": crack_time,
+            "crack_unit": crack_unit,
         }
-        breach_count = pwned_passwords_count(password)
-        return render_template_string(
-            HTML_TEMPLATE,
-            password=password,
-            analysis=analysis,
-            generated_password=None,
-            breach_count=breach_count,
-        )
 
-    @app.route("/generate", methods=["POST"])
-    def generate() -> str:
-        length = int(request.form.get("length", 16))
-        generated_password = generate_password(length=length)
-        return render_template_string(
-            HTML_TEMPLATE,
-            password=generated_password,
-            analysis=None,
-            generated_password=generated_password,
-            breach_count=None,
-        )
+    @app.context_processor
+    def inject_user():
+        return {"current_user": current_user()}
+
+    @app.route("/")
+    def index() -> Any:
+        if current_user():
+            return redirect(url_for("dashboard"))
+        return redirect(url_for("login"))
+
+    @app.route("/signup", methods=["GET", "POST"])
+    def signup() -> Any:
+        if current_user():
+            return redirect(url_for("dashboard"))
+        if request.method == "POST":
+            username = request.form["username"].strip()
+            password = request.form["password"]
+            if not username or not password:
+                flash("Both username and password are required.", "danger")
+            else:
+                try:
+                    manager.register_user(username, password)
+                    session["username"] = username
+                    flash("Welcome! Your account has been created.", "success")
+                    return redirect(url_for("dashboard"))
+                except ValueError as exc:
+                    flash(str(exc), "danger")
+        return render_template("signup.html")
+
+    @app.route("/login", methods=["GET", "POST"])
+    def login() -> Any:
+        if current_user():
+            return redirect(url_for("dashboard"))
+        if request.method == "POST":
+            username = request.form["username"].strip()
+            password = request.form["password"]
+            if manager.authenticate_user(username, password):
+                session["username"] = username
+                flash(f"Welcome back, {username}!", "success")
+                return redirect(url_for("dashboard"))
+            flash("Invalid username or password.", "danger")
+        return render_template("login.html")
+
+    @app.route("/logout")
+    @login_required
+    def logout() -> Any:
+        session.clear()
+        flash("You have been logged out.", "info")
+        return redirect(url_for("login"))
+
+    @app.route("/dashboard")
+    @login_required
+    def dashboard() -> Any:
+        return render_template("dashboard.html")
+
+    @app.route("/analyze", methods=["GET", "POST"])
+    @login_required
+    def analyze() -> Any:
+        analysis = None
+        breach_count = None
+        password = ""
+        if request.method == "POST":
+            password = request.form["password"]
+            analysis = build_analysis(password)
+            breach_count = pwned_passwords_count(password)
+        return render_template("analyze.html", password=password, analysis=analysis, breach_count=breach_count)
+
+    @app.route("/generate", methods=["GET", "POST"])
+    @login_required
+    def generate() -> Any:
+        generated_password = ""
+        if request.method == "POST":
+            length = int(request.form.get("length", 16))
+            generated_password = generate_password(length=length)
+        return render_template("generate.html", generated_password=generated_password)
+
+    @app.route("/breach", methods=["GET", "POST"])
+    @login_required
+    def breach() -> Any:
+        breach_count = None
+        password = ""
+        if request.method == "POST":
+            password = request.form["password"]
+            breach_count = pwned_passwords_count(password)
+        return render_template("breach.html", password=password, breach_count=breach_count)
+
+    @app.route("/profile")
+    @login_required
+    def profile() -> Any:
+        user = manager.get_user(current_user())
+        return render_template("profile.html", user=user)
 
     return app
 

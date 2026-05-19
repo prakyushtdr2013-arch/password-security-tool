@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+{% block title %}Login | PassGuard{% endblock %}
+
+{% block content %}
+  <section class="hero-card auth-card">
+    <div class="hero-copy">
+      <h1>Welcome back.</h1>
+      <p>Log in to manage your passwords, analyze strength, and generate secure credentials.</p>
+    </div>
+    <form class="auth-form" method="post" action="{{ url_for('login') }}">
+      <label>Username</label>
+      <input type="text" name="username" placeholder="username" required />
+      <label>Password</label>
+      <input type="password" name="password" placeholder="password" required />
+      <button type="submit">Login</button>
+      <p class="form-foot">New here? <a href="{{ url_for('signup') }}">Create an account</a>.</p>
+    </form>
+  </section>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block title %}Generate Password | PassGuard{% endblock %}
+
+{% block content %}
+  <section class="content-card">
+    <h1>Generate a Strong Password</h1>
+    <p>Choose the length and create a secure password instantly.</p>
+    <form class="tool-form" method="post" action="{{ url_for('generate') }}">
+      <label>Length</label>
+      <input type="number" name="length" value="16" min="8" max="64" required />
+      <button type="submit">Generate</button>
+    </form>
+
+    {% if generated_password %}
+      <div class="result-panel">
+        <h3>Your generated password</h3>
+        <div class="generated-secret">{{ generated_password }}</div>
+        <p class="muted">Copy this password somewhere secure or use it immediately.</p>
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}

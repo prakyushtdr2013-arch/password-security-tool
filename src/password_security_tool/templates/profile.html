@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block title %}Profile | PassGuard{% endblock %}
+
+{% block content %}
+  <section class="content-card profile-card">
+    <h1>Your profile</h1>
+    <div class="profile-grid">
+      <div><strong>Username</strong><p>{{ user.username }}</p></div>
+      <div><strong>Role</strong><p>{{ user.role | title }}</p></div>
+      <div><strong>2FA Secret</strong><p class="muted">{{ user.totp_secret }}</p></div>
+    </div>
+    <p class="muted">This demo account information is stored in memory while the local server is running.</p>
+  </section>
+{% endblock %}

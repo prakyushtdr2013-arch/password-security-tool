@@ -57,6 +57,13 @@ Then open:
 http://127.0.0.1:5000
 ```
 
+A demo login is available:
+
+```text
+username: admin
+password: Admin123!
+```
+
 ## Development
 
 Run tests:

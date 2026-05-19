@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block title %}Analyze Password | PassGuard{% endblock %}
+
+{% block content %}
+  <section class="content-card">
+    <h1>Analyze Password Strength</h1>
+    <p>Enter a password to see entropy, complexity, and breach checks.</p>
+    <form class="tool-form" method="post" action="{{ url_for('analyze') }}">
+      <label>Password</label>
+      <input type="password" name="password" value="{{ password }}" placeholder="Enter password" required />
+      <button type="submit">Analyze</button>
+    </form>
+
+    {% if analysis %}
+      <div class="result-panel">
+        <div class="result-header">
+          <div>
+            <p class="eyebrow">Strength Score</p>
+            <h2>{{ analysis.strength }}</h2>
+          </div>
+          <div class="badge badge-score">{{ analysis.score }} / 100</div>
+        </div>
+        <div class="result-grid">
+          <div class="result-card">
+            <strong>Entropy</strong>
+            <p>{{ analysis.entropy }} bits</p>
+          </div>
+          <div class="result-card">
+            <strong>Crack time</strong>
+            <p>{{ analysis.crack_time }} {{ analysis.crack_unit }}</p>
+          </div>
+          <div class="result-card">
+            <strong>Breach hits</strong>
+            <p>{{ breach_count }}</p>
+          </div>
+        </div>
+        <div class="result-details">
+          <h3>Detected patterns</h3>
+          <p>{{ analysis.patterns | join(', ') if analysis.patterns else 'None' }}</p>
+          <h3>Suggestions</h3>
+          <ul>{% for suggestion in analysis.suggestions %}<li>{{ suggestion }}</li>{% endfor %}</ul>
+        </div>
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}

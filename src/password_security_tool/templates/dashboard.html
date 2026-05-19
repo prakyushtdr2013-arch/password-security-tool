@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard | PassGuard{% endblock %}
+
+{% block content %}
+  <section class="dashboard-hero">
+    <div>
+      <p class="eyebrow">Secure password management</p>
+      <h1>Welcome to PassGuard.</h1>
+      <p>Track breaches, analyze strength, and generate strong passwords all from your local browser.</p>
+    </div>
+    <div class="hero-actions">
+      <a class="card-link" href="{{ url_for('analyze') }}">
+        <h2>Analyze Password</h2>
+        <p>Check entropy, patterns and strength in one step.</p>
+      </a>
+      <a class="card-link" href="{{ url_for('generate') }}">
+        <h2>Generate Password</h2>
+        <p>Create a secure password with custom length.</p>
+      </a>
+      <a class="card-link" href="{{ url_for('breach') }}">
+        <h2>Breach Lookup</h2>
+        <p>Verify whether a password appears in known breaches.</p>
+      </a>
+    </div>
+  </section>
+{% endblock %}

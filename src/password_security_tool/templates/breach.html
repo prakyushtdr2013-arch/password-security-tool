@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block title %}Breach Lookup | PassGuard{% endblock %}
+
+{% block content %}
+  <section class="content-card">
+    <h1>Have I Been Pwned</h1>
+    <p>Check whether a password has appeared in known breach datasets.</p>
+    <form class="tool-form" method="post" action="{{ url_for('breach') }}">
+      <label>Password</label>
+      <input type="password" name="password" value="{{ password }}" placeholder="Enter password" required />
+      <button type="submit">Check Breach</button>
+    </form>
+
+    {% if breach_count is not none %}
+      <div class="result-panel">
+        <h3>Results</h3>
+        <p class="breach-result">
+          {% if breach_count > 0 %}
+            This password appears in <strong>{{ breach_count }}</strong> breaches.
+          {% else %}
+            Great news — no breaches found for this password.
+          {% endif %}
+        </p>
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}

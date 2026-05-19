@@ -42,6 +42,8 @@ class UserManager:
     def register_user(self, username: str, password: str, role: str = ROLE_USER, algorithm: str = "bcrypt") -> User:
         if role not in {ROLE_ADMIN, ROLE_USER}:
             raise ValueError("Invalid role")
+        if username.lower() in self.users:
+            raise ValueError("Username already exists")
         password_hash = hash_password(password, algorithm)
         user = User(username=username, role=role, password_hash=password_hash)
         self.users[username.lower()] = user
@@ -60,6 +62,9 @@ class UserManager:
     def authorize(self, username: str, required_role: str) -> bool:
         user = self.users.get(username.lower())
         return bool(user and user.role == required_role)
+
+    def get_user(self, username: str) -> Optional[User]:
+        return self.users.get(username.lower())
 
 
 def hash_password(password: str, algorithm: str = "bcrypt") -> str:

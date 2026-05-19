@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}Password Security Tool{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <div class="brand-panel">
+          <a class="brand-title" href="{{ url_for('dashboard') }}">PassGuard</a>
+          <p class="brand-subtitle">Secure password analysis and account manager</p>
+        </div>
+        <nav class="nav-links">
+          <a href="{{ url_for('dashboard') }}">Dashboard</a>
+          {% if current_user %}
+            <a href="{{ url_for('analyze') }}">Analyze</a>
+            <a href="{{ url_for('generate') }}">Generate</a>
+            <a href="{{ url_for('breach') }}">Breach</a>
+            <a href="{{ url_for('profile') }}">Account</a>
+            <a class="button secondary" href="{{ url_for('logout') }}">Logout</a>
+          {% else %}
+            <a href="{{ url_for('login') }}">Login</a>
+            <a class="button" href="{{ url_for('signup') }}">Sign Up</a>
+          {% endif %}
+        </nav>
+      </header>
+
+      <main class="content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="flash-grid">
+              {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">{{ message }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+      </main>
+
+      <footer class="footer">
+        <span>Hosted locally for secure password evaluation and user management.</span>
+      </footer>
+    </div>
+  </body>
+</html>
