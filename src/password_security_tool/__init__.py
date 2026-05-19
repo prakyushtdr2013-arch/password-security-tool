@@ -1,0 +1,31 @@
+from .core import (
+    User,
+    UserManager,
+    hash_password,
+    verify_password,
+    calculate_entropy,
+    complexity_score,
+    is_common_password,
+    detect_patterns,
+    strength_meter,
+    suggest_improvements,
+    generate_password,
+    pwned_passwords_count,
+    estimate_crack_time,
+)
+
+__all__ = [
+    "User",
+    "UserManager",
+    "hash_password",
+    "verify_password",
+    "calculate_entropy",
+    "complexity_score",
+    "is_common_password",
+    "detect_patterns",
+    "strength_meter",
+    "suggest_improvements",
+    "generate_password",
+    "pwned_passwords_count",
+    "estimate_crack_time",
+]

@@ -1,0 +1,49 @@
+import re
+
+from password_security_tool.core import (
+    calculate_entropy,
+    complexity_score,
+    detect_patterns,
+    generate_password,
+    hash_password,
+    is_common_password,
+    strength_meter,
+    verify_password,
+)
+
+
+def test_calculate_entropy_runs():
+    entropy = calculate_entropy("P@ssw0rd123")
+    assert entropy > 0
+
+
+def test_complexity_score_and_strength():
+    weak = complexity_score("password")
+    strong = complexity_score("S3cure!Pa55word")
+    assert weak < strong
+    assert strength_meter(weak) == "Weak"
+    assert strength_meter(strong) in {"Moderate", "Strong"}
+
+
+def test_detect_patterns():
+    patterns = detect_patterns("qwerty1234")
+    assert any("Keyboard pattern" in p for p in patterns)
+
+
+def test_generate_password_length():
+    value = generate_password(length=20)
+    assert len(value) == 20
+    assert re.search(r"[A-Z]", value)
+    assert re.search(r"[a-z]", value)
+    assert re.search(r"[0-9]", value)
+
+
+def test_hash_and_verify_password():
+    original = "S3curePa$$"
+    hashed = hash_password(original, algorithm="bcrypt")
+    assert verify_password(original, hashed)
+
+
+def test_common_password_detection():
+    assert is_common_password("password")
+    assert not is_common_password("Uniqu3P@ssw0rd!")
