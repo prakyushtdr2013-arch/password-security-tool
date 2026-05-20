@@ -38,6 +38,18 @@ def test_generate_password_length():
     assert re.search(r"[0-9]", value)
 
 
+def test_generate_password_excludes_ambiguous():
+    value = generate_password(length=32, exclude_ambiguous=True)
+    assert not re.search(r"[Il1O0o]", value)
+
+
+def test_generate_passphrase_style():
+    value = generate_password(length=5, passphrase=True)
+    assert value.count("-") == 4
+    assert len(value.split("-")) == 5
+    assert re.search(r"^[a-z]+(-[a-z]+)+$", value)
+
+
 def test_hash_and_verify_password():
     original = "S3curePa$$"
     hashed = hash_password(original, algorithm="bcrypt")

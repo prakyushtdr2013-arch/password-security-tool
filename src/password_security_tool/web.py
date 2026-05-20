@@ -133,10 +133,45 @@ def create_app() -> Flask:
     @login_required
     def generate() -> Any:
         generated_password = ""
+        analysis = None
+        options = {
+            "length": 16,
+            "upper": True,
+            "lower": True,
+            "digits": True,
+            "symbols": True,
+            "exclude_ambiguous": False,
+            "passphrase": False,
+        }
+
         if request.method == "POST":
-            length = int(request.form.get("length", 16))
-            generated_password = generate_password(length=length)
-        return render_template("generate.html", generated_password=generated_password)
+            options["length"] = int(request.form.get("length", 16))
+            options["upper"] = bool(request.form.get("upper"))
+            options["lower"] = bool(request.form.get("lower"))
+            options["digits"] = bool(request.form.get("digits"))
+            options["symbols"] = bool(request.form.get("symbols"))
+            options["exclude_ambiguous"] = bool(request.form.get("exclude_ambiguous"))
+            options["passphrase"] = bool(request.form.get("passphrase"))
+            try:
+                generated_password = generate_password(
+                    length=options["length"],
+                    upper=options["upper"],
+                    lower=options["lower"],
+                    digits=options["digits"],
+                    symbols=options["symbols"],
+                    exclude_ambiguous=options["exclude_ambiguous"],
+                    passphrase=options["passphrase"],
+                )
+                analysis = build_analysis(generated_password)
+            except ValueError as exc:
+                flash(str(exc), "danger")
+
+        return render_template(
+            "generate.html",
+            generated_password=generated_password,
+            analysis=analysis,
+            options=options,
+        )
 
     @app.route("/breach", methods=["GET", "POST"])
     @login_required

@@ -23,6 +23,17 @@ KEYBOARD_PATTERNS = [
     "letmein",
 ]
 
+AMBIGUOUS_CHARACTERS = set("Il1O0o{}[]()/\\'\"`~,;:.<>")
+WORDLIST = [
+    "able", "breeze", "canvas", "dawn", "ember", "feather", "glow", "harbor",
+    "island", "jewel", "kettle", "lunar", "mosaic", "nebula", "orchid", "pioneer",
+    "quartz", "raven", "sage", "tango", "umbra", "velvet", "wander", "xenon",
+    "yarn", "zephyr", "apex", "brisk", "cinder", "drift", "elixir", "fjord",
+    "garnet", "haven", "indigo", "jade", "kinetic", "lucid", "mythic", "nova",
+    "opal", "prism", "quill", "rift", "solace", "tide", "urban", "vista",
+    "whisper", "yearn", "zenith", "atlas", "brook", "crest", "ember", "flint",
+]
+
 ROLE_ADMIN = "admin"
 ROLE_USER = "user"
 
@@ -187,12 +198,12 @@ def suggest_improvements(password: str) -> List[str]:
     return suggestions
 
 
-def generate_password(
-    length: int = 16,
-    upper: bool = True,
-    lower: bool = True,
-    digits: bool = True,
-    symbols: bool = True,
+def _build_alphabet(
+    upper: bool,
+    lower: bool,
+    digits: bool,
+    symbols: bool,
+    exclude_ambiguous: bool,
 ) -> str:
     alphabet = ""
     if upper:
@@ -203,6 +214,25 @@ def generate_password(
         alphabet += string.digits
     if symbols:
         alphabet += string.punctuation
+    if exclude_ambiguous:
+        alphabet = "".join(ch for ch in alphabet if ch not in AMBIGUOUS_CHARACTERS)
+    return alphabet
+
+
+def generate_password(
+    length: int = 16,
+    upper: bool = True,
+    lower: bool = True,
+    digits: bool = True,
+    symbols: bool = True,
+    exclude_ambiguous: bool = False,
+    passphrase: bool = False,
+) -> str:
+    if passphrase:
+        word_count = max(3, min(length, 12))
+        return "-".join(secrets.choice(WORDLIST) for _ in range(word_count))
+
+    alphabet = _build_alphabet(upper, lower, digits, symbols, exclude_ambiguous)
     if not alphabet:
         raise ValueError("At least one character category must be enabled.")
     return "".join(secrets.choice(alphabet) for _ in range(length))

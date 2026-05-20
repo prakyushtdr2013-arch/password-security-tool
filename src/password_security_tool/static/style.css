@@ -259,6 +259,141 @@ button:hover {
   color: #cbd5e1;
 }
 
+.option-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 18px;
+  background: rgba(30, 41, 59, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  cursor: pointer;
+}
+
+.checkbox-label input {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.checkbox-label.full-width {
+  grid-column: 1 / -1;
+}
+
+.toggle-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 18px;
+  background: rgba(30, 41, 59, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.copy-button {
+  background: rgba(56, 189, 248, 0.12);
+  color: #bae6fd;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  font-weight: 700;
+}
+
+.copy-button:hover {
+  background: rgba(56, 189, 248, 0.22);
+}
+
+.strength-card {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.strength-label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  color: #cbd5e1;
+}
+
+.strength-meter {
+  background: rgba(148, 163, 184, 0.12);
+  border-radius: 9999px;
+  overflow: hidden;
+  height: 16px;
+}
+
+.strength-bar {
+  width: 0;
+  height: 100%;
+  transition: width 240ms ease, background 240ms ease;
+  border-radius: 9999px;
+}
+
+.strength-bar.weak {
+  background: #f87171;
+}
+
+.strength-bar.moderate {
+  background: #facc15;
+}
+
+.strength-bar.strong {
+  background: #22c55e;
+}
+
+.strength-text {
+  margin-top: 0.75rem;
+  color: #cbd5e1;
+}
+
+.suggestions {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 18px;
+  background: rgba(30, 41, 59, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.suggestions ul {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: #cbd5e1;
+}
+
+.suggestions li {
+  margin-bottom: 0.6rem;
+}
+
+.suggestion-strong {
+  margin: 0;
+  color: #86efac;
+}
+
+.generated-secret {
+  margin-top: 1rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  background: rgba(15, 23, 42, 0.96);
+  padding: 1rem;
+  border-radius: 18px;
+  word-break: break-word;
+}
+
+.result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
 .result-details {
   margin-top: 1.5rem;
 }
