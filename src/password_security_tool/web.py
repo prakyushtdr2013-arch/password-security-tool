@@ -12,10 +12,10 @@ from flask import (
     url_for,
 )
 
+from .auth import AuthError, AuthService
 from .core import (
     ROLE_ADMIN,
     ROLE_USER,
-    UserManager,
     calculate_entropy,
     complexity_score,
     detect_patterns,
@@ -30,24 +30,57 @@ from .core import (
 def create_app() -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.secret_key = os.environ.get("SECRET_KEY", "dev-password-tool-secret")
+    app.config.update(
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "").lower() == "true",
+        PERMANENT_SESSION_LIFETIME=60 * 60 * 8,
+    )
 
-    manager = UserManager()
-    # Seed a demo admin account for quick login.
-    if not manager.get_user("admin"):
-        manager.register_user("admin", "Admin123!", role=ROLE_ADMIN)
+    auth = AuthService(os.environ.get("PASSWORD_TOOL_DB", "password_tool.sqlite3"))
+    if not auth.get_user("admin"):
+        try:
+            auth.register_user(
+                "admin",
+                os.environ.get("ADMIN_EMAIL", "admin@example.com"),
+                os.environ.get("ADMIN_PASSWORD", "Admin123!"),
+                role=ROLE_ADMIN,
+            )
+        except AuthError:
+            pass
+
+    def current_session():
+        return auth.get_session(session.get("auth_token"))
 
     def current_user() -> str | None:
-        return session.get("username")
+        active = current_session()
+        return active.username if active else None
 
     def login_required(view):
         @wraps(view)
         def wrapped(*args: Any, **kwargs: Any):
-            if not current_user():
+            if not current_session():
+                session.clear()
                 flash("Please log in to continue.", "warning")
                 return redirect(url_for("login"))
             return view(*args, **kwargs)
 
         return wrapped
+
+    def roles_required(*roles: str):
+        def decorator(view):
+            @wraps(view)
+            def wrapped(*args: Any, **kwargs: Any):
+                try:
+                    auth.require_role(session.get("auth_token"), roles)
+                except AuthError as exc:
+                    flash(str(exc), "danger")
+                    return redirect(url_for("dashboard"))
+                return view(*args, **kwargs)
+
+            return wrapped
+
+        return decorator
 
     def build_analysis(password: str) -> Dict[str, Any]:
         score = complexity_score(password)
@@ -64,7 +97,8 @@ def create_app() -> Flask:
 
     @app.context_processor
     def inject_user():
-        return {"current_user": current_user()}
+        active = current_session()
+        return {"current_user": active.username if active else None, "current_role": active.role if active else None}
 
     @app.route("/")
     def index() -> Any:
@@ -78,16 +112,16 @@ def create_app() -> Flask:
             return redirect(url_for("dashboard"))
         if request.method == "POST":
             username = request.form["username"].strip()
+            email = request.form["email"].strip()
             password = request.form["password"]
-            if not username or not password:
-                flash("Both username and password are required.", "danger")
+            if not username or not email or not password:
+                flash("Username, email, and password are required.", "danger")
             else:
                 try:
-                    manager.register_user(username, password)
-                    session["username"] = username
-                    flash("Welcome! Your account has been created.", "success")
-                    return redirect(url_for("dashboard"))
-                except ValueError as exc:
+                    auth.register_user(username, email, password, role=ROLE_USER)
+                    flash("Account created. Check your email for the OTP after login.", "success")
+                    return redirect(url_for("login"))
+                except AuthError as exc:
                     flash(str(exc), "danger")
         return render_template("signup.html")
 
@@ -98,16 +132,39 @@ def create_app() -> Flask:
         if request.method == "POST":
             username = request.form["username"].strip()
             password = request.form["password"]
-            if manager.authenticate_user(username, password):
-                session["username"] = username
-                flash(f"Welcome back, {username}!", "success")
-                return redirect(url_for("dashboard"))
-            flash("Invalid username or password.", "danger")
+            try:
+                user = auth.start_login(username, password)
+                session.clear()
+                session["pending_username"] = user.username
+                if auth.otp_service.dry_run and auth.otp_service.last_otp:
+                    flash(f"Development OTP: {auth.otp_service.last_otp}", "info")
+                flash("Verification code sent to your email.", "success")
+                return redirect(url_for("verify_otp"))
+            except AuthError as exc:
+                flash(str(exc), "danger")
         return render_template("login.html")
+
+    @app.route("/verify-otp", methods=["GET", "POST"])
+    def verify_otp() -> Any:
+        pending_username = session.get("pending_username")
+        if not pending_username:
+            return redirect(url_for("login"))
+        if request.method == "POST":
+            otp = request.form["otp"].strip()
+            try:
+                auth_session = auth.verify_login_otp(pending_username, otp)
+                session.clear()
+                session["auth_token"] = auth_session.token
+                flash(f"Welcome back, {auth_session.username}!", "success")
+                return redirect(url_for("dashboard"))
+            except AuthError as exc:
+                flash(str(exc), "danger")
+        return render_template("verify_otp.html", username=pending_username)
 
     @app.route("/logout")
     @login_required
     def logout() -> Any:
+        auth.logout(session.get("auth_token"))
         session.clear()
         flash("You have been logged out.", "info")
         return redirect(url_for("login"))
@@ -186,8 +243,14 @@ def create_app() -> Flask:
     @app.route("/profile")
     @login_required
     def profile() -> Any:
-        user = manager.get_user(current_user())
+        user = auth.get_user(current_user())
         return render_template("profile.html", user=user)
+
+    @app.route("/admin")
+    @login_required
+    @roles_required(ROLE_ADMIN)
+    def admin() -> Any:
+        return render_template("admin.html")
 
     return app
 

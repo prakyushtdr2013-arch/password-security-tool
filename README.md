@@ -4,8 +4,9 @@ A Python-based password strength checker and secure password manager with RBAC, 
 
 ## Features
 
-- Secure login with role-based access control (RBAC)
-- Optional 2FA using TOTP
+- Secure registration and login with role-based access control (RBAC)
+- Email OTP 2FA using Gmail app-password SMTP in production and dry-run codes in development
+- Login attempt limiting, temporary account lockout, and server-side logout/session invalidation
 - Password entropy and complexity scoring
 - Detection of weak patterns and common passwords
 - Have I Been Pwned breach lookups via the k-Anonymity API
@@ -63,6 +64,8 @@ A demo login is available:
 username: admin
 password: Admin123!
 ```
+
+The admin email defaults to `admin@example.com`. Set `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and `SECRET_KEY` for a real deployment-style local run. See [docs/authentication.md](docs/authentication.md) for the schema, backend API, RBAC, 2FA, and testing steps.
 
 ## Development
 

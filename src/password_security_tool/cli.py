@@ -1,8 +1,8 @@
 import argparse
 from typing import List
 
+from .auth import AuthError, AuthService
 from .core import (
-    UserManager,
     calculate_entropy,
     complexity_score,
     detect_patterns,
@@ -69,18 +69,27 @@ def generate_command(args: argparse.Namespace) -> None:
 
 
 def register_command(args: argparse.Namespace) -> None:
-    manager = UserManager()
-    user = manager.register_user(args.username, args.password, role=args.role)
+    auth = AuthService(args.db)
+    user = auth.register_user(args.username, args.email, args.password, role=args.role, algorithm=args.algorithm)
     print(f"Registered {user.username} with role {user.role}.")
-    print(f"2FA secret: {user.totp_secret}")
+    print("Email OTP will be required at login.")
 
 
 def login_command(args: argparse.Namespace) -> None:
-    manager = UserManager()
-    # Example login demonstration; in production, use persistent storage.
-    manager.register_user(args.username, args.password, role=args.role)
-    accepted = manager.authenticate_user(args.username, args.password, token=args.token)
-    print("Login successful." if accepted else "Login failed.")
+    auth = AuthService(args.db)
+    try:
+        if args.otp:
+            session_info = auth.authenticate_user(args.username, args.password, args.otp)
+            print(f"Login successful. Session token: {session_info.token}")
+            return
+
+        auth.start_login(args.username, args.password)
+        print("OTP sent to the user's email address.")
+        if auth.otp_service.dry_run and auth.otp_service.last_otp:
+            print(f"Development OTP: {auth.otp_service.last_otp}")
+        print("Run login again with --otp <code> to create a session.")
+    except AuthError as exc:
+        print(f"Login failed: {exc}")
 
 
 def main(argv: List[str] | None = None) -> None:
@@ -110,13 +119,16 @@ def main(argv: List[str] | None = None) -> None:
     login = subparsers.add_parser("login", help="Demonstrate a user login with RBAC and optional 2FA")
     login.add_argument("username", help="Username")
     login.add_argument("password", help="Password")
-    login.add_argument("--role", choices=["admin", "user"], default="user", help="User role")
-    login.add_argument("--token", help="TOTP token for 2FA")
+    login.add_argument("--otp", help="Email OTP for 2FA")
+    login.add_argument("--db", default="password_tool.sqlite3", help="SQLite database path")
 
     register = subparsers.add_parser("register", help="Register a demo user")
     register.add_argument("username", help="Username")
+    register.add_argument("email", help="Email address for login OTP delivery")
     register.add_argument("password", help="Password")
     register.add_argument("--role", choices=["admin", "user"], default="user", help="User role")
+    register.add_argument("--algorithm", choices=["argon2", "bcrypt"], default="argon2", help="Password hashing algorithm")
+    register.add_argument("--db", default="password_tool.sqlite3", help="SQLite database path")
 
     args = parser.parse_args(argv)
     if args.command == "analyze":
