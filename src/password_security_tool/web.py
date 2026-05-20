@@ -34,7 +34,7 @@ def create_app() -> Flask:
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "").lower() == "true",
-        PERMANENT_SESSION_LIFETIME=60 * 60 * 8,
+        PERMANENT_SESSION_LIFETIME=60 * 60 * 1,
     )
 
     auth = AuthService(os.environ.get("PASSWORD_TOOL_DB", "password_tool.sqlite3"))
@@ -81,6 +81,17 @@ def create_app() -> Flask:
             return wrapped
 
         return decorator
+
+    @app.before_request
+    def session_timeout_handler() -> None:
+        """Check and enforce session timeout before each request."""
+        auth_token = session.get("auth_token")
+        if auth_token:
+            active_session = auth.get_session(auth_token)
+            if not active_session:
+                session.clear()
+                if request.endpoint not in ("login", "signup", "static"):
+                    flash("Your session has expired. Please log in again.", "warning")
 
     def build_analysis(password: str) -> Dict[str, Any]:
         score = complexity_score(password)
@@ -154,6 +165,7 @@ def create_app() -> Flask:
             try:
                 auth_session = auth.verify_login_otp(pending_username, otp)
                 session.clear()
+                session.permanent = True
                 session["auth_token"] = auth_session.token
                 flash(f"Welcome back, {auth_session.username}!", "success")
                 return redirect(url_for("dashboard"))

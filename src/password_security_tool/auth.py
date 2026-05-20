@@ -15,7 +15,7 @@ DEFAULT_DB_PATH = Path(os.environ.get("PASSWORD_TOOL_DB", "password_tool.sqlite3
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_MINUTES = 15
 OTP_TTL_MINUTES = 10
-SESSION_TTL_HOURS = 8
+SESSION_TTL_HOURS = 1
 
 
 class AuthError(Exception):
