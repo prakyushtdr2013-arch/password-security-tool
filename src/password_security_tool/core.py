@@ -15,12 +15,33 @@ import requests
 COMMON_PASSWORDS_PATH = Path(__file__).parent / "data" / "common_passwords.txt"
 KEYBOARD_PATTERNS = [
     "qwerty",
+    "qwertyuiop",
     "asdfgh",
+    "asdfghjkl",
     "zxcvbn",
-    "123456",
     "password",
     "admin",
     "letmein",
+]
+COMMON_SUBSTITUTIONS = str.maketrans(
+    {
+        "@": "a",
+        "4": "a",
+        "0": "o",
+        "1": "i",
+        "!": "i",
+        "3": "e",
+        "$": "s",
+        "5": "s",
+        "7": "t",
+        "+": "t",
+    }
+)
+SEQUENTIAL_ALPHABETS = [
+    string.ascii_lowercase,
+    string.ascii_lowercase[::-1],
+    string.digits,
+    string.digits[::-1],
 ]
 
 AMBIGUOUS_CHARACTERS = set("Il1O0o{}[]()/\\'\"`~,;:.<>")
@@ -44,6 +65,21 @@ class User:
     role: str
     password_hash: str
     totp_secret: str = field(default_factory=pyotp.random_base32)
+
+
+@dataclass(frozen=True)
+class PasswordAnalysis:
+    password: str
+    entropy: float
+    score: int
+    strength: str
+    length_score: int
+    variety_score: int
+    entropy_score: int
+    penalties: int
+    patterns: List[str]
+    suggestions: List[str]
+    is_dictionary_match: bool
 
 
 class UserManager:
@@ -121,38 +157,40 @@ def _load_common_passwords() -> set[str]:
 
 
 def calculate_entropy(password: str) -> float:
-    categories = {
-        "lower": bool(re.search(r"[a-z]", password)),
-        "upper": bool(re.search(r"[A-Z]", password)),
-        "digits": bool(re.search(r"[0-9]", password)),
-        "symbols": bool(re.search(r"[^A-Za-z0-9]", password)),
-    }
-    charset_size = 0
-    if categories["lower"]:
-        charset_size += 26
-    if categories["upper"]:
-        charset_size += 26
-    if categories["digits"]:
-        charset_size += 10
-    if categories["symbols"]:
-        charset_size += 32
+    charset_size = _charset_size(password)
     if charset_size == 0 or len(password) == 0:
         return 0.0
     return round(len(password) * math.log2(charset_size), 2)
 
 
 def complexity_score(password: str) -> int:
+    return analyze_password_strength(password).score
+
+
+def analyze_password_strength(password: str) -> PasswordAnalysis:
     entropy = calculate_entropy(password)
-    length_bonus = min(max(len(password) - 8, 0), 20)
-    variety = sum(
-        bool(re.search(pattern, password))
-        for pattern in [r"[a-z]", r"[A-Z]", r"[0-9]", r"[^A-Za-z0-9]"]
+    patterns = detect_patterns(password)
+    dictionary_match = is_common_password(password) or is_common_password(_normalize_substitutions(password))
+
+    length_score = _length_score(password)
+    variety_score = _variety_score(password)
+    entropy_score = min(int(entropy / 1.5), 35)
+    penalties = _weakness_penalty(password, patterns, dictionary_match)
+    score = min(max(length_score + variety_score + entropy_score - penalties, 0), 100)
+
+    return PasswordAnalysis(
+        password=password,
+        entropy=entropy,
+        score=score,
+        strength=strength_meter(score),
+        length_score=length_score,
+        variety_score=variety_score,
+        entropy_score=entropy_score,
+        penalties=penalties,
+        patterns=patterns,
+        suggestions=_build_suggestions(password, patterns, dictionary_match),
+        is_dictionary_match=dictionary_match,
     )
-    variety_bonus = variety * 10
-    score = int(min(max(entropy / 2 + length_bonus + variety_bonus, 0), 100))
-    if is_common_password(password):
-        score = min(score, 20)
-    return score
 
 
 def is_common_password(password: str) -> bool:
@@ -161,25 +199,38 @@ def is_common_password(password: str) -> bool:
 
 def detect_patterns(password: str) -> List[str]:
     findings: List[str] = []
-    if re.search(r"(.)\1{2,}", password):
+    lowered = password.lower()
+    normalized = _normalize_substitutions(password)
+
+    if re.search(r"(.)\1{2,}", lowered):
         findings.append("Repeated characters")
-    if re.search(r"(?:0123|1234|2345|3456|4567|5678|6789)", password):
-        findings.append("Numeric sequence")
+    if _contains_sequence(lowered, min_length=3):
+        findings.append("Sequential characters")
     for pattern in KEYBOARD_PATTERNS:
-        if pattern in password.lower():
+        if pattern in lowered:
             findings.append(f"Keyboard pattern: {pattern}")
+    if normalized != lowered and is_common_password(normalized):
+        findings.append(f"Common substitution for dictionary word: {normalized}")
     return findings
 
 
 def strength_meter(score: int) -> str:
-    if score < 35:
+    if score < 20:
+        return "Very Weak"
+    if score < 40:
         return "Weak"
-    if score < 65:
+    if score < 60:
         return "Moderate"
-    return "Strong"
+    if score < 80:
+        return "Strong"
+    return "Very Strong"
 
 
 def suggest_improvements(password: str) -> List[str]:
+    return analyze_password_strength(password).suggestions
+
+
+def _build_suggestions(password: str, patterns: List[str], dictionary_match: bool) -> List[str]:
     suggestions: List[str] = []
     if len(password) < 12:
         suggestions.append("Increase length to 12 or more characters.")
@@ -191,11 +242,73 @@ def suggest_improvements(password: str) -> List[str]:
         suggestions.append("Add digits.")
     if not re.search(r"[^A-Za-z0-9]", password):
         suggestions.append("Add symbols or punctuation.")
-    if is_common_password(password):
+    if dictionary_match:
         suggestions.append("Avoid common passwords or simple dictionary words.")
-    if detect_patterns(password):
-        suggestions.append("Avoid keyboard sequences and repeated characters.")
+    if patterns:
+        suggestions.append("Avoid keyboard sequences, sequential characters, repeated characters, and predictable substitutions.")
     return suggestions
+
+
+def _charset_size(password: str) -> int:
+    charset_size = 0
+    if re.search(r"[a-z]", password):
+        charset_size += 26
+    if re.search(r"[A-Z]", password):
+        charset_size += 26
+    if re.search(r"[0-9]", password):
+        charset_size += 10
+    if re.search(r"[^A-Za-z0-9]", password):
+        charset_size += 32
+    return charset_size
+
+
+def _length_score(password: str) -> int:
+    length = len(password)
+    if length >= 16:
+        return 25
+    if length >= 12:
+        return 20
+    if length >= 8:
+        return 12
+    if length >= 6:
+        return 6
+    return 0
+
+
+def _variety_score(password: str) -> int:
+    categories = [
+        bool(re.search(r"[a-z]", password)),
+        bool(re.search(r"[A-Z]", password)),
+        bool(re.search(r"[0-9]", password)),
+        bool(re.search(r"[^A-Za-z0-9]", password)),
+    ]
+    return sum(categories) * 10
+
+
+def _weakness_penalty(password: str, patterns: List[str], dictionary_match: bool) -> int:
+    penalty = 0
+    if dictionary_match:
+        penalty += 45
+    penalty += min(len(patterns) * 12, 36)
+    if len(set(password.lower())) <= 3 and password:
+        penalty += 15
+    return penalty
+
+
+def _normalize_substitutions(password: str) -> str:
+    return password.lower().translate(COMMON_SUBSTITUTIONS)
+
+
+def _contains_sequence(password: str, min_length: int = 3) -> bool:
+    compact = re.sub(r"[^a-z0-9]", "", password.lower())
+    if len(compact) < min_length:
+        return False
+    for alphabet in SEQUENTIAL_ALPHABETS:
+        for size in range(min_length, min(len(compact), 6) + 1):
+            for start in range(0, len(compact) - size + 1):
+                if compact[start : start + size] in alphabet:
+                    return True
+    return False
 
 
 def _build_alphabet(
@@ -251,10 +364,7 @@ def pwned_passwords_count(password: str) -> int:
 
 
 def estimate_crack_time(password: str, guesses_per_second: float = 1e9) -> Tuple[float, str]:
-    charset_size = sum(
-        bool(re.search(pattern, password))
-        for pattern in [r"[a-z]", r"[A-Z]", r"[0-9]", r"[^A-Za-z0-9]"]
-    )
+    charset_size = _charset_size(password)
     if charset_size == 0 or len(password) == 0:
         return 0.0, "Instant"
     guesses = charset_size**len(password)

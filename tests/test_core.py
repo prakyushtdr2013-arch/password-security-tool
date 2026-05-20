@@ -1,6 +1,7 @@
 import re
 
 from password_security_tool.core import (
+    analyze_password_strength,
     calculate_entropy,
     complexity_score,
     detect_patterns,
@@ -19,15 +20,39 @@ def test_calculate_entropy_runs():
 
 def test_complexity_score_and_strength():
     weak = complexity_score("password")
-    strong = complexity_score("S3cure!Pa55word")
+    strong = complexity_score("S3cure!Pa55wordVault")
     assert weak < strong
-    assert strength_meter(weak) == "Weak"
-    assert strength_meter(strong) in {"Moderate", "Strong"}
+    assert strength_meter(weak) == "Very Weak"
+    assert strength_meter(strong) in {"Strong", "Very Strong"}
+
+
+def test_password_analysis_exposes_scoring_breakdown():
+    analysis = analyze_password_strength("S3cure!Pa55wordVault")
+    assert analysis.entropy > 0
+    assert analysis.length_score > 0
+    assert analysis.variety_score == 40
+    assert analysis.score >= 60
+    assert analysis.strength in {"Strong", "Very Strong"}
 
 
 def test_detect_patterns():
     patterns = detect_patterns("qwerty1234")
     assert any("Keyboard pattern" in p for p in patterns)
+    assert "Sequential characters" in patterns
+
+
+def test_detect_common_substitution_dictionary_attack():
+    analysis = analyze_password_strength("P@ssw0rd")
+    assert analysis.is_dictionary_match
+    assert any("Common substitution" in p for p in analysis.patterns)
+    assert analysis.score < 40
+
+
+def test_detect_repeated_and_alpha_numeric_sequences():
+    repeated = detect_patterns("aaaaaa")
+    sequential = detect_patterns("abc123")
+    assert "Repeated characters" in repeated
+    assert "Sequential characters" in sequential
 
 
 def test_generate_password_length():

@@ -8,7 +8,7 @@ A Python-based password strength checker and secure password manager with RBAC, 
 - Email OTP 2FA using Gmail app-password SMTP in production and dry-run codes in development
 - Login attempt limiting, temporary account lockout, and server-side logout/session invalidation
 - Password entropy and complexity scoring
-- Detection of weak patterns and common passwords
+- Detection of weak patterns, common passwords, common substitutions, repeated characters, and sequential characters
 - Have I Been Pwned breach lookups via the k-Anonymity API
 - Secure password generator with configurable sets
 - bcrypt and Argon2 hashing demonstrations
@@ -65,7 +65,7 @@ username: admin
 password: Admin123!
 ```
 
-The admin email defaults to `admin@example.com`. Set `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and `SECRET_KEY` for a real deployment-style local run. See [docs/authentication.md](docs/authentication.md) for the schema, backend API, RBAC, 2FA, and testing steps.
+The admin email defaults to `admin@example.com`. Set `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and `SECRET_KEY` for a real deployment-style local run. See [docs/authentication.md](docs/authentication.md) for the schema, backend API, RBAC, 2FA, and testing steps. See [docs/password_analysis_engine.md](docs/password_analysis_engine.md) for the strength scoring method and sample test cases.
 
 ## Development
 
