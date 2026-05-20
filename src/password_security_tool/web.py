@@ -12,7 +12,7 @@ from flask import (
     url_for,
 )
 
-from .auth import AuthError, AuthService
+from .auth import AuthError, AuthService, STATUS_ACTIVE, STATUS_DISABLED
 from .core import (
     ROLE_ADMIN,
     ROLE_USER,
@@ -258,11 +258,87 @@ def create_app() -> Flask:
         user = auth.get_user(current_user())
         return render_template("profile.html", user=user)
 
-    @app.route("/admin")
+    @app.route("/admin", methods=["GET", "POST"])
     @login_required
     @roles_required(ROLE_ADMIN)
     def admin() -> Any:
-        return render_template("admin.html")
+        active = current_session()
+        if not active:
+            flash("Authentication required.", "warning")
+            return redirect(url_for("login"))
+
+        message = None
+        users = auth.list_users()
+        policy = auth.get_password_policy()
+        audit_events = auth.get_recent_audit_events(25)
+        stats = {
+            "total_users": len(users),
+            "active_sessions": auth.get_active_session_count(),
+            "locked_users": auth.get_locked_user_count(),
+            "disabled_users": sum(1 for user in users if user.status == STATUS_DISABLED),
+        }
+
+        if request.method == "POST":
+            action = request.form.get("admin_action")
+            username = request.form.get("target_user")
+            try:
+                if action in {"disable", "enable"}:
+                    if not username:
+                        raise AuthError("No user selected.")
+                    if username == "admin" and action == "disable":
+                        raise AuthError("Cannot disable the built-in admin account.")
+                    status = STATUS_DISABLED if action == "disable" else STATUS_ACTIVE
+                    auth.update_user_status(username, status, actor_user_id=active.user_id)
+                    flash(f"User {username} has been {status}.", "success")
+                elif action == "set_role":
+                    if not username:
+                        raise AuthError("No user selected.")
+                    new_role = request.form.get("role")
+                    if new_role not in {ROLE_ADMIN, ROLE_USER}:
+                        raise AuthError("Invalid role selected.")
+                    auth.change_user_role(username, new_role, actor_user_id=active.user_id)
+                    flash(f"Role for {username} updated to {new_role}.", "success")
+                elif action == "update_policy":
+                    updated_policy = {
+                        "minimum_length": int(request.form.get("minimum_length", policy["minimum_length"])),
+                        "require_uppercase": bool(request.form.get("require_uppercase")),
+                        "require_lowercase": bool(request.form.get("require_lowercase")),
+                        "require_numbers": bool(request.form.get("require_numbers")),
+                        "require_special_characters": bool(request.form.get("require_special_characters")),
+                        "block_common_passwords": bool(request.form.get("block_common_passwords")),
+                        "minimum_entropy": int(request.form.get("minimum_entropy", policy["minimum_entropy"])),
+                        "lockout_threshold": int(request.form.get("lockout_threshold", policy["lockout_threshold"])),
+                        "lockout_duration_minutes": int(request.form.get("lockout_duration_minutes", policy["lockout_duration_minutes"])),
+                    }
+                    auth.set_password_policy(updated_policy)
+                    auth.record_audit_event(
+                        "password_policy_updated",
+                        actor_user_id=active.user_id,
+                        details="Admin updated password policy settings.",
+                    )
+                    flash("Password policy has been updated.", "success")
+                else:
+                    raise AuthError("Unknown admin action.")
+            except AuthError as exc:
+                flash(str(exc), "danger")
+
+            users = auth.list_users()
+            policy = auth.get_password_policy()
+            audit_events = auth.get_recent_audit_events(25)
+            stats = {
+                "total_users": len(users),
+                "active_sessions": auth.get_active_session_count(),
+                "locked_users": auth.get_locked_user_count(),
+                "disabled_users": sum(1 for user in users if user.status == STATUS_DISABLED),
+            }
+
+        return render_template(
+            "admin.html",
+            users=users,
+            policy=policy,
+            stats=stats,
+            audit_events=audit_events,
+        )
 
     return app
 

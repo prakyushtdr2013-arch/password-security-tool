@@ -2,7 +2,14 @@ import sqlite3
 
 import pytest
 
-from password_security_tool.auth import AuthError, AuthService, EmailOTPService, MAX_FAILED_ATTEMPTS
+from password_security_tool.auth import (
+    AuthError,
+    AuthService,
+    EmailOTPService,
+    MAX_FAILED_ATTEMPTS,
+    ROLE_ADMIN,
+    STATUS_DISABLED,
+)
 
 
 def build_auth(tmp_path):
@@ -60,4 +67,33 @@ def test_database_schema_contains_users_roles_sessions_and_otps(tmp_path):
             for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
         }
 
-    assert {"users", "roles", "sessions", "user_otps"}.issubset(tables)
+    assert {"users", "roles", "sessions", "user_otps", "user_audit_logs", "password_policies"}.issubset(tables)
+
+
+def test_admin_user_management_and_audit_events(tmp_path):
+    auth, _ = build_auth(tmp_path)
+    auth.register_user("admin", "admin@example.com", "Admin!Passw0rd", role=ROLE_ADMIN, algorithm="bcrypt")
+    auth.register_user("bob", "bob@example.com", "S3cure!Passw0rd", algorithm="bcrypt")
+
+    assert len(auth.list_users()) == 2
+    auth.update_user_status("bob", STATUS_DISABLED, actor_user_id=1)
+    assert auth.get_user("bob").status == STATUS_DISABLED
+
+    auth.change_user_role("bob", ROLE_ADMIN, actor_user_id=1)
+    assert auth.get_user("bob").role == ROLE_ADMIN
+
+    auth.set_password_policy({
+        "minimum_length": 16,
+        "require_uppercase": True,
+        "require_lowercase": True,
+        "require_numbers": True,
+        "require_special_characters": True,
+        "block_common_passwords": True,
+        "minimum_entropy": 70,
+        "lockout_threshold": 5,
+        "lockout_duration_minutes": 15,
+    })
+    assert auth.get_password_policy()["minimum_length"] == 16
+
+    events = auth.get_recent_audit_events(10)
+    assert any(event["event_type"] == "user_status_changed" for event in events)
