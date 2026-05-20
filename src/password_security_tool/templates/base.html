@@ -10,8 +10,13 @@
     <div class="page-shell">
       <header class="topbar">
         <div class="brand-panel">
-          <a class="brand-title" href="{{ url_for('dashboard') }}">PassGuard</a>
-          <p class="brand-subtitle">Secure password analysis and account manager</p>
+          <a class="brand-logo" href="{{ url_for('dashboard') }}">
+            <span class="logo-mark">PG</span>
+            <span>
+              <span class="brand-title">PassGuard</span>
+              <span class="brand-subtitle">Secure password analysis</span>
+            </span>
+          </a>
         </div>
         <nav class="nav-links">
           <a href="{{ url_for('dashboard') }}">Dashboard</a>
@@ -22,8 +27,16 @@
             {% if current_role == 'admin' %}
               <a href="{{ url_for('admin') }}">Admin</a>
             {% endif %}
-            <a href="{{ url_for('profile') }}">Account</a>
-            <a class="button secondary" href="{{ url_for('logout') }}">Logout</a>
+            <div class="dropdown">
+              <button type="button" class="dropdown-toggle" aria-haspopup="true" aria-expanded="false">
+                <span class="user-icon">👤</span>
+                <span class="user-label">{{ current_user.username }}</span>
+              </button>
+              <div class="dropdown-menu">
+                <a href="{{ url_for('profile') }}">Profile</a>
+                <a href="{{ url_for('logout') }}">Logout</a>
+              </div>
+            </div>
           {% else %}
             <a href="{{ url_for('login') }}">Login</a>
             <a class="button" href="{{ url_for('signup') }}">Sign Up</a>
@@ -49,5 +62,29 @@
         <span>Hosted locally for secure password evaluation and user management.</span>
       </footer>
     </div>
+
+    <script>
+      const dropdown = document.querySelector('.dropdown');
+      if (dropdown) {
+        const toggle = dropdown.querySelector('.dropdown-toggle');
+
+        toggle.addEventListener('click', function (event) {
+          event.stopPropagation();
+          dropdown.classList.toggle('open');
+        });
+
+        document.addEventListener('click', function (event) {
+          if (!dropdown.contains(event.target)) {
+            dropdown.classList.remove('open');
+          }
+        });
+
+        document.addEventListener('keydown', function (event) {
+          if (event.key === 'Escape') {
+            dropdown.classList.remove('open');
+          }
+        });
+      }
+    </script>
   </body>
 </html>
