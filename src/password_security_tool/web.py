@@ -27,8 +27,7 @@ from .core import (
 )
 
 
-def create_app() -> Flask:
-    app = Flask(__name__, template_folder="templates", static_folder="static")
+def _configure_app(app: Flask) -> None:
     app.secret_key = os.environ.get("SECRET_KEY", "dev-password-tool-secret")
     app.config.update(
         SESSION_COOKIE_HTTPONLY=True,
@@ -37,7 +36,8 @@ def create_app() -> Flask:
         PERMANENT_SESSION_LIFETIME=60 * 60 * 1,
     )
 
-    auth = AuthService(os.environ.get("PASSWORD_TOOL_DB", "password_tool.sqlite3"))
+
+def _ensure_admin_user(auth: AuthService) -> None:
     if not auth.get_user("admin"):
         try:
             auth.register_user(
@@ -49,17 +49,29 @@ def create_app() -> Flask:
         except AuthError:
             pass
 
-    def current_session():
-        return auth.get_session(session.get("auth_token"))
 
-    def current_user() -> str | None:
-        active = current_session()
-        return active.username if active else None
+def _parse_password_length(raw_length: str | None, default: int) -> int:
+    try:
+        length = int(raw_length)
+    except (TypeError, ValueError):
+        length = default
+    return max(8, min(length, 64))
 
-    def login_required(view):
+
+def _current_session(auth: AuthService):
+    return auth.get_session(session.get("auth_token"))
+
+
+def _current_user(auth: AuthService) -> str | None:
+    active = _current_session(auth)
+    return active.username if active else None
+
+
+def _login_required(auth: AuthService):
+    def decorator(view):
         @wraps(view)
         def wrapped(*args: Any, **kwargs: Any):
-            if not current_session():
+            if not _current_session(auth):
                 session.clear()
                 flash("Please log in to continue.", "warning")
                 return redirect(url_for("login"))
@@ -67,21 +79,40 @@ def create_app() -> Flask:
 
         return wrapped
 
-    def roles_required(*roles: str):
-        def decorator(view):
-            @wraps(view)
-            def wrapped(*args: Any, **kwargs: Any):
-                try:
-                    auth.require_role(session.get("auth_token"), roles)
-                except AuthError as exc:
-                    flash(str(exc), "danger")
-                    return redirect(url_for("dashboard"))
-                return view(*args, **kwargs)
+    return decorator
 
-            return wrapped
 
-        return decorator
+def _roles_required(auth: AuthService, *roles: str):
+    def decorator(view):
+        @wraps(view)
+        def wrapped(*args: Any, **kwargs: Any):
+            try:
+                auth.require_role(session.get("auth_token"), roles)
+            except AuthError as exc:
+                flash(str(exc), "danger")
+                return redirect(url_for("dashboard"))
+            return view(*args, **kwargs)
 
+        return wrapped
+
+    return decorator
+
+
+def _build_analysis(password: str) -> Dict[str, Any]:
+    score = complexity_score(password)
+    crack_time, crack_unit = estimate_crack_time(password)
+    return {
+        "score": score,
+        "strength": strength_meter(score),
+        "entropy": calculate_entropy(password),
+        "patterns": detect_patterns(password),
+        "suggestions": suggest_improvements(password),
+        "crack_time": crack_time,
+        "crack_unit": crack_unit,
+    }
+
+
+def _register_routes(app: Flask, auth: AuthService) -> None:
     @app.before_request
     def session_timeout_handler() -> None:
         """Check and enforce session timeout before each request."""
@@ -93,33 +124,23 @@ def create_app() -> Flask:
                 if request.endpoint not in ("login", "signup", "static"):
                     flash("Your session has expired. Please log in again.", "warning")
 
-    def build_analysis(password: str) -> Dict[str, Any]:
-        score = complexity_score(password)
-        crack_time, crack_unit = estimate_crack_time(password)
-        return {
-            "score": score,
-            "strength": strength_meter(score),
-            "entropy": calculate_entropy(password),
-            "patterns": detect_patterns(password),
-            "suggestions": suggest_improvements(password),
-            "crack_time": crack_time,
-            "crack_unit": crack_unit,
-        }
-
     @app.context_processor
     def inject_user():
-        active = current_session()
-        return {"current_user": active.username if active else None, "current_role": active.role if active else None}
+        active = _current_session(auth)
+        return {
+            "current_user": active.username if active else None,
+            "current_role": active.role if active else None,
+        }
 
     @app.route("/")
     def index() -> Any:
-        if current_user():
+        if _current_user(auth):
             return redirect(url_for("dashboard"))
         return redirect(url_for("login"))
 
     @app.route("/signup", methods=["GET", "POST"])
     def signup() -> Any:
-        if current_user():
+        if _current_user(auth):
             return redirect(url_for("dashboard"))
         if request.method == "POST":
             username = request.form["username"].strip()
@@ -138,7 +159,7 @@ def create_app() -> Flask:
 
     @app.route("/login", methods=["GET", "POST"])
     def login() -> Any:
-        if current_user():
+        if _current_user(auth):
             return redirect(url_for("dashboard"))
         if request.method == "POST":
             username = request.form["username"].strip()
@@ -174,7 +195,7 @@ def create_app() -> Flask:
         return render_template("verify_otp.html", username=pending_username)
 
     @app.route("/logout")
-    @login_required
+    @_login_required(auth)
     def logout() -> Any:
         auth.logout(session.get("auth_token"))
         session.clear()
@@ -182,24 +203,24 @@ def create_app() -> Flask:
         return redirect(url_for("login"))
 
     @app.route("/dashboard")
-    @login_required
+    @_login_required(auth)
     def dashboard() -> Any:
         return render_template("dashboard.html")
 
     @app.route("/analyze", methods=["GET", "POST"])
-    @login_required
+    @_login_required(auth)
     def analyze() -> Any:
         analysis = None
         breach_count = None
         password = ""
         if request.method == "POST":
             password = request.form["password"]
-            analysis = build_analysis(password)
+            analysis = _build_analysis(password)
             breach_count = pwned_passwords_count(password)
         return render_template("analyze.html", password=password, analysis=analysis, breach_count=breach_count)
 
     @app.route("/generate", methods=["GET", "POST"])
-    @login_required
+    @_login_required(auth)
     def generate() -> Any:
         generated_password = ""
         analysis = None
@@ -214,7 +235,7 @@ def create_app() -> Flask:
         }
 
         if request.method == "POST":
-            options["length"] = int(request.form.get("length", 16))
+            options["length"] = _parse_password_length(request.form.get("length"), options["length"])
             options["upper"] = bool(request.form.get("upper"))
             options["lower"] = bool(request.form.get("lower"))
             options["digits"] = bool(request.form.get("digits"))
@@ -231,7 +252,7 @@ def create_app() -> Flask:
                     exclude_ambiguous=options["exclude_ambiguous"],
                     passphrase=options["passphrase"],
                 )
-                analysis = build_analysis(generated_password)
+                analysis = _build_analysis(generated_password)
             except ValueError as exc:
                 flash(str(exc), "danger")
 
@@ -243,7 +264,7 @@ def create_app() -> Flask:
         )
 
     @app.route("/breach", methods=["GET", "POST"])
-    @login_required
+    @_login_required(auth)
     def breach() -> Any:
         breach_count = None
         password = ""
@@ -253,21 +274,20 @@ def create_app() -> Flask:
         return render_template("breach.html", password=password, breach_count=breach_count)
 
     @app.route("/profile")
-    @login_required
+    @_login_required(auth)
     def profile() -> Any:
-        user = auth.get_user(current_user())
+        user = auth.get_user(_current_user(auth))
         return render_template("profile.html", user=user)
 
     @app.route("/admin", methods=["GET", "POST"])
-    @login_required
-    @roles_required(ROLE_ADMIN)
+    @_login_required(auth)
+    @_roles_required(auth, ROLE_ADMIN)
     def admin() -> Any:
-        active = current_session()
+        active = _current_session(auth)
         if not active:
             flash("Authentication required.", "warning")
             return redirect(url_for("login"))
 
-        message = None
         users = auth.list_users()
         policy = auth.get_password_policy()
         audit_events = auth.get_recent_audit_events(25)
@@ -339,6 +359,15 @@ def create_app() -> Flask:
             stats=stats,
             audit_events=audit_events,
         )
+
+
+def create_app() -> Flask:
+    app = Flask(__name__, template_folder="templates", static_folder="static")
+    _configure_app(app)
+
+    auth = AuthService(os.environ.get("PASSWORD_TOOL_DB", "password_tool.sqlite3"))
+    _ensure_admin_user(auth)
+    _register_routes(app, auth)
 
     return app
 

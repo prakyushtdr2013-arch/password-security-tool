@@ -31,3 +31,22 @@ jobs:
       - run: bandit -r src/password_security_tool -lll
       - run: semgrep --config=p/python-security --timeout 120 src/password_security_tool
       - run: python -m pip_audit
+
+  sonarcloud:
+    name: SonarCloud Analysis
+    if: ${{ secrets.SONAR_TOKEN != '' && secrets.SONAR_ORGANIZATION != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e .
+      - name: SonarCloud Scan
+        uses: sonarsource/sonarcloud-github-action@v1.12.0
+        with:
+          organization: ${{ secrets.SONAR_ORGANIZATION }}
+          token: ${{ secrets.SONAR_TOKEN }}
+          projectKey: password-security-tool
+          projectName: Password Security Tool

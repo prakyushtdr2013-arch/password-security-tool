@@ -37,6 +37,10 @@ COMMON_SUBSTITUTIONS = str.maketrans(
         "+": "t",
     }
 )
+RE_UPPER = re.compile(r"[A-Z]")
+RE_LOWER = re.compile(r"[a-z]")
+RE_DIGIT = re.compile(r"[0-9]")
+RE_SYMBOL = re.compile(r"[^A-Za-z0-9]")
 SEQUENTIAL_ALPHABETS = [
     string.ascii_lowercase,
     string.ascii_lowercase[::-1],
@@ -234,13 +238,13 @@ def _build_suggestions(password: str, patterns: List[str], dictionary_match: boo
     suggestions: List[str] = []
     if len(password) < 12:
         suggestions.append("Increase length to 12 or more characters.")
-    if not re.search(r"[A-Z]", password):
+    if not RE_UPPER.search(password):
         suggestions.append("Add uppercase letters.")
-    if not re.search(r"[a-z]", password):
+    if not RE_LOWER.search(password):
         suggestions.append("Add lowercase letters.")
-    if not re.search(r"[0-9]", password):
+    if not RE_DIGIT.search(password):
         suggestions.append("Add digits.")
-    if not re.search(r"[^A-Za-z0-9]", password):
+    if not RE_SYMBOL.search(password):
         suggestions.append("Add symbols or punctuation.")
     if dictionary_match:
         suggestions.append("Avoid common passwords or simple dictionary words.")
@@ -251,13 +255,13 @@ def _build_suggestions(password: str, patterns: List[str], dictionary_match: boo
 
 def _charset_size(password: str) -> int:
     charset_size = 0
-    if re.search(r"[a-z]", password):
+    if RE_LOWER.search(password):
         charset_size += 26
-    if re.search(r"[A-Z]", password):
+    if RE_UPPER.search(password):
         charset_size += 26
-    if re.search(r"[0-9]", password):
+    if RE_DIGIT.search(password):
         charset_size += 10
-    if re.search(r"[^A-Za-z0-9]", password):
+    if RE_SYMBOL.search(password):
         charset_size += 32
     return charset_size
 
@@ -277,10 +281,10 @@ def _length_score(password: str) -> int:
 
 def _variety_score(password: str) -> int:
     categories = [
-        bool(re.search(r"[a-z]", password)),
-        bool(re.search(r"[A-Z]", password)),
-        bool(re.search(r"[0-9]", password)),
-        bool(re.search(r"[^A-Za-z0-9]", password)),
+        bool(RE_LOWER.search(password)),
+        bool(RE_UPPER.search(password)),
+        bool(RE_DIGIT.search(password)),
+        bool(RE_SYMBOL.search(password)),
     ]
     return sum(categories) * 10
 
@@ -344,6 +348,9 @@ def generate_password(
     if passphrase:
         word_count = max(3, min(length, 12))
         return "-".join(secrets.choice(WORDLIST) for _ in range(word_count))
+
+    if length < 8 or length > 128:
+        raise ValueError("Password length must be between 8 and 128.")
 
     alphabet = _build_alphabet(upper, lower, digits, symbols, exclude_ambiguous)
     if not alphabet:

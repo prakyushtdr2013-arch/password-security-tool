@@ -34,6 +34,10 @@ DEFAULT_PASSWORD_POLICY = {
 STATUS_ACTIVE = "active"
 STATUS_DISABLED = "disabled"
 
+INVALID_CREDENTIALS = "Invalid username or password."
+ACCOUNT_DISABLED_ERROR = "Account is disabled."
+USER_NOT_FOUND_ERROR = "User not found."
+
 
 @dataclass(frozen=True)
 class AuthUser:
@@ -187,7 +191,7 @@ class AuthService:
         if not user:
             raise AuthError("Invalid verification request.")
         if user.status == STATUS_DISABLED:
-            raise AuthError("Account is disabled.")
+            raise AuthError(ACCOUNT_DISABLED_ERROR)
         if not self._consume_valid_otp(user.id, otp):
             raise AuthError("Invalid or expired verification code.")
         session = self.create_session(user.id)
@@ -202,14 +206,14 @@ class AuthService:
     def authenticate_user(self, username: str, password: str, otp: str) -> SessionInfo:
         user = self.get_user(username)
         if not user:
-            raise AuthError("Invalid username or password.")
+            raise AuthError(INVALID_CREDENTIALS)
         if user.status == STATUS_DISABLED:
-            raise AuthError("Account is disabled.")
+            raise AuthError(ACCOUNT_DISABLED_ERROR)
         if self._is_locked(user):
             raise AuthError("Account is temporarily locked. Try again later.")
         if not verify_password(password, user.password_hash):
             self._record_failed_attempt(user.id)
-            raise AuthError("Invalid username or password.")
+            raise AuthError(INVALID_CREDENTIALS)
         if not self._consume_valid_otp(user.id, otp):
             raise AuthError("Invalid or expired verification code.")
         self._reset_failed_attempts(user.id)
@@ -218,7 +222,7 @@ class AuthService:
     def create_session(self, user_id: int) -> SessionInfo:
         user = self.get_user_by_id(user_id)
         if not user:
-            raise AuthError("User not found.")
+            raise AuthError(USER_NOT_FOUND_ERROR)
         token = secrets.token_urlsafe(32)
         expires_at = _utc_now() + timedelta(hours=SESSION_TTL_HOURS)
         with self._connection() as conn:
