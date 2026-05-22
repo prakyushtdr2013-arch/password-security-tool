@@ -1,18 +1,16 @@
 # Password Security Tool
 
-A Python-based password strength checker and secure password manager with RBAC, 2FA, hash demonstrations, breach checks, and password generation.
+A Python password security toolkit that combines password strength analysis, breach checking, secure generation, RBAC, and 2FA in a single package.
 
-## Features
+## Key Features
 
-- Secure registration and login with role-based access control (RBAC)
-- Email OTP 2FA using Gmail app-password SMTP in production and dry-run codes in development
-- Login attempt limiting, temporary account lockout, and server-side logout/session invalidation
-- Password entropy and complexity scoring
-- Detection of weak patterns, common passwords, common substitutions, repeated characters, and sequential characters
+- Registration, login, and role-based access control (RBAC)
+- Email OTP 2FA with production Gmail app-password support and development dry-run mode
+- Password entropy, complexity, dictionary match, substitution, keyboard-pattern, sequential, and repeated-character analysis
 - Have I Been Pwned breach lookups via the k-Anonymity API
-- Secure password generator with configurable sets
-- bcrypt and Argon2 hashing demonstrations
-- Crack-time estimation for password strength
+- Secure password generation with configurable length and character sets
+- Hash demonstrations for bcrypt and Argon2
+- Flask-based local web interface with admin and user workflows
 
 ## Installation
 
@@ -20,7 +18,7 @@ A Python-based password strength checker and secure password manager with RBAC, 
 python -m pip install -e .
 ```
 
-## Usage
+## Quick Start
 
 Analyze a password:
 
@@ -34,7 +32,7 @@ Generate a password:
 python -m password_security_tool.cli generate --length 18
 ```
 
-Check a password against breaches:
+Check password breach status:
 
 ```bash
 python -m password_security_tool.cli check-breach "YourPassword123!"
@@ -46,30 +44,35 @@ Show hash examples:
 python -m password_security_tool.cli hash-demo "YourPassword123!"
 ```
 
-Run the local web interface:
+Run the local web UI:
 
 ```bash
 python -m password_security_tool.cli serve
 ```
 
-Then open:
+Open your browser at:
 
 ```text
 http://127.0.0.1:5000
 ```
 
-A demo login is available:
+A demo admin login is available:
 
 ```text
 username: admin
 password: Admin123!
 ```
 
-The admin email defaults to `admin@example.com`. Set `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and `SECRET_KEY` for a real deployment-style local run. See [docs/authentication.md](docs/authentication.md) for the schema, backend API, RBAC, 2FA, and testing steps. See [docs/password_analysis_engine.md](docs/password_analysis_engine.md) for the strength scoring method and sample test cases.
+## Documentation
+
+- [Usage guide](docs/usage.md)
+- [Authentication and 2FA](docs/authentication.md)
+- [Password analysis engine](docs/password_analysis_engine.md)
+- [Documentation index](docs/index.md)
 
 ## Development
 
-Run tests:
+Run tests with:
 
 ```bash
 pytest -q
