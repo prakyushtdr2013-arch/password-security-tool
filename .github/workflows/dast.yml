@@ -24,18 +24,28 @@ jobs:
 
       - name: Start Flask App
         run: |
-          python web.py > flask.log 2>&1 &
-          sleep 15
-
+          python -m src.password_security_tool.web > flask.log 2>&1 &
+          sleep 20
+          
       # ✅ This will show us WHY flask failed
       - name: Show Flask Logs
-        run: cat flask.log
+        if: always()
+        run: |
+          echo "=== Flask Logs ===" && cat flask.log
+          echo ""
+          echo "=== Running Processes ===" && ps aux | grep -E "python|flask"
 
       # ✅ This confirms if port is open
       - name: Check Port 5000
         run: |
+          echo "Testing curl..."
           curl -v http://localhost:5000 || true
+          echo ""
+          echo "Checking open ports..."
           ss -tlnp | grep 5000 || echo "Port 5000 not open!"
+          echo ""
+          echo "All listening ports:"
+          ss -tlnp
 
       - name: ZAP Baseline Scan
         uses: zaproxy/action-baseline@v0.10.0
@@ -45,13 +55,17 @@ jobs:
           allow_issue_writing: false
 
       - name: Upload Flask Log
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: flask-log
           path: flask.log
+          if-no-files-found: ignore
 
       - name: Upload ZAP Report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: zap-report
           path: report_html.html
+          if-no-files-found: ignore
