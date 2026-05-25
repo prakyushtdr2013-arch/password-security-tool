@@ -142,6 +142,26 @@ def _register_routes(app: Flask, auth: AuthService) -> None:
             "csrf_token": session.get("csrf_token"),
         }
 
+    @app.after_request
+    def set_security_headers(response):
+        """Set security headers including Content Security Policy."""
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; "
+            "font-src 'self'; "
+            "form-action 'self'; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "object-src 'none'"
+        )
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
     @app.route("/")
     def index() -> Any:
         if _current_user(auth):
