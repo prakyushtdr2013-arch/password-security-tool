@@ -62,9 +62,12 @@ body {
   border-radius: 0.85rem;
   background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%);
   color: #020617;
-  font-weight: 800;
-  letter-spacing: 0.1em;
   box-shadow: 0 16px 40px rgba(56, 189, 248, 0.2);
+}
+
+.logo-mark svg {
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .brand-title {
@@ -659,8 +662,15 @@ button:hover {
 
 .result-grid {
   display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 2rem;
+}
+
+@media (max-width: 980px) {
+  .result-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .result-card {

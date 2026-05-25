@@ -30,39 +30,59 @@
       <button type="submit">Generate Password</button>
     </form>
 
-    <div class="result-panel">
-      <div class="result-header">
-        <div>
-          <h3>Live password preview</h3>
-          <p class="muted">Edit or copy the password below to analyze strength instantly.</p>
+    <div class="result-grid">
+      <section class="output-card">
+        <div class="result-header">
+          <div>
+            <h3>Generated password</h3>
+            <p class="muted">Create a strong password from your selected options.</p>
+          </div>
+          <button class="copy-button" type="button" id="copyGeneratedButton">Copy</button>
         </div>
-        <button class="copy-button" type="button" id="copyButton">Copy</button>
-      </div>
 
-      <label>Generated / entered password</label>
-      <input id="passwordInput" type="text" value="{{ generated_password }}" placeholder="Enter a password to analyze" />
+        <label for="generatedPassword">Generated password</label>
+        <input id="generatedPassword" type="text" readonly value="{{ generated_password }}" placeholder="Generate a password to see it here" />
 
-      <div class="strength-card">
-        <div class="strength-label">Strength</div>
-        <div class="strength-meter">
-          <div class="strength-bar" id="strengthBar"></div>
+        <div class="output-meta">
+          <span>Length: {{ generated_password|length if generated_password else '—' }}</span>
+          <span>{{ 'Passphrase' if options.passphrase else 'Password' }}</span>
         </div>
-        <div class="strength-text" id="strengthText">Start typing to see strength.</div>
-      </div>
+      </section>
 
-      <div class="suggestions" id="suggestionsList">
-        <p class="muted">Suggestions will appear here as you type.</p>
-      </div>
-
-      {% if analysis %}
-        <div class="result-card">
-          <strong>Server analysis</strong>
-          <p>Score: {{ analysis.score }} / 100</p>
-          <p>Strength: {{ analysis.strength }}</p>
-          <p>Entropy: {{ analysis.entropy }} bits</p>
-          <p>Breach estimate: {{ analysis.crack_time }} {{ analysis.crack_unit }}</p>
+      <section class="output-card">
+        <div class="result-header">
+          <div>
+            <h3>Live password preview</h3>
+            <p class="muted">Type or paste a password to analyze strength instantly.</p>
+          </div>
+          <button class="copy-button" type="button" id="copyPreviewButton">Copy</button>
         </div>
-      {% endif %}
+
+        <label for="passwordInput">Generated / entered password</label>
+        <input id="passwordInput" type="text" value="{{ generated_password }}" placeholder="Enter a password to analyze" />
+
+        <div class="strength-card">
+          <div class="strength-label">Strength</div>
+          <div class="strength-meter">
+            <div class="strength-bar" id="strengthBar"></div>
+          </div>
+          <div class="strength-text" id="strengthText">Start typing to see strength.</div>
+        </div>
+
+        <div class="suggestions" id="suggestionsList">
+          <p class="muted">Suggestions will appear here as you type.</p>
+        </div>
+
+        {% if analysis %}
+          <div class="result-card">
+            <strong>Server analysis</strong>
+            <p>Score: {{ analysis.score }} / 100</p>
+            <p>Strength: {{ analysis.strength }}</p>
+            <p>Entropy: {{ analysis.entropy }} bits</p>
+            <p>Breach estimate: {{ analysis.crack_time }} {{ analysis.crack_unit }}</p>
+          </div>
+        {% endif %}
+      </section>
     </div>
   </section>
 
@@ -71,10 +91,12 @@
     const lengthInput = document.getElementById('lengthInput');
     const passphraseToggle = document.getElementById('passphraseToggle');
     const passwordInput = document.getElementById('passwordInput');
+    const generatedPasswordInput = document.getElementById('generatedPassword');
     const strengthBar = document.getElementById('strengthBar');
     const strengthText = document.getElementById('strengthText');
     const suggestionsList = document.getElementById('suggestionsList');
-    const copyButton = document.getElementById('copyButton');
+    const copyGeneratedButton = document.getElementById('copyGeneratedButton');
+    const copyPreviewButton = document.getElementById('copyPreviewButton');
 
     const AMBIGUOUS = /[Il1O0o]/;
 
@@ -142,18 +164,20 @@
       }
     }
 
-    function copyPassword() {
-      const text = passwordInput.value.trim();
+    function copyPassword(inputElement, buttonElement) {
+      const text = inputElement.value.trim();
       if (!text) return;
       navigator.clipboard.writeText(text).then(() => {
-        copyButton.textContent = 'Copied!';
-        setTimeout(() => { copyButton.textContent = 'Copy'; }, 1600);
+        const originalText = buttonElement.textContent;
+        buttonElement.textContent = 'Copied!';
+        setTimeout(() => { buttonElement.textContent = originalText; }, 1600);
       });
     }
 
     passphraseToggle.addEventListener('change', updateLengthLabel);
     passwordInput.addEventListener('input', updateMeter);
-    copyButton.addEventListener('click', copyPassword);
+    copyGeneratedButton.addEventListener('click', () => copyPassword(generatedPasswordInput, copyGeneratedButton));
+    copyPreviewButton.addEventListener('click', () => copyPassword(passwordInput, copyPreviewButton));
     window.addEventListener('DOMContentLoaded', () => {
       updateLengthLabel();
       updateMeter();
