@@ -50,3 +50,30 @@ jobs:
           token: 6adf455c0f98375b0d436cfed50fb67873d8184f
           projectKey: password-security-tool
           projectName: Password Security Tool
+
+  dast:
+    name: DAST Scan (OWASP ZAP)
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e .
+      - name: Start Flask app for scanning
+        run: |
+          python -m password_security_tool.web &
+          echo "Waiting for app startup"
+          sleep 10
+      - name: Run OWASP ZAP baseline scan
+        run: |
+          docker pull owasp/zap2docker-stable
+          docker run --rm --network host owasp/zap2docker-stable zap-baseline.py -t http://127.0.0.1:5000 -r zap-report.html
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: zap-report.html
