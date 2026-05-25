@@ -25,7 +25,19 @@ jobs:
       - name: Start Flask App
         run: |
           python -m src.password_security_tool.web > flask.log 2>&1 &
-          sleep 20
+          sleep 5
+          # Wait for Flask to be ready
+          for i in {1..30}; do
+            if curl -s http://localhost:5000 > /dev/null 2>&1; then
+              echo "Flask is running!"
+              exit 0
+            fi
+            echo "Attempt $i: Waiting for Flask to start..."
+            sleep 1
+          done
+          echo "Flask failed to start!"
+          cat flask.log
+          exit 1
           
       # ✅ This will show us WHY flask failed
       - name: Show Flask Logs
@@ -47,12 +59,16 @@ jobs:
           echo "All listening ports:"
           ss -tlnp
 
+      - name: Create ZAP output directory
+        run: mkdir -p /tmp/zap-output && chmod 777 /tmp/zap-output
+
       - name: ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.10.0
-        with:
-          target: 'http://localhost:5000'
-          fail_action: false
-          allow_issue_writing: false
+        run: |
+          docker run \
+            -v /tmp/zap-output:/zap/wrk:rw \
+            --network=host \
+            -t ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t http://localhost:5000 -r /zap/wrk/report_html.html || true
 
       - name: Upload Flask Log
         if: always()
@@ -67,5 +83,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: zap-report
-          path: report_html.html
+          path: /tmp/zap-output/report_html.html
           if-no-files-found: ignore
