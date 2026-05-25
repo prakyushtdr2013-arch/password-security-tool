@@ -359,7 +359,7 @@ def generate_password(
 
 
 def pwned_passwords_count(password: str) -> int:
-    sha1 = hashlib.sha1(password.encode("utf-8")).hexdigest().upper()
+    sha1 = hashlib.sha1(password.encode("utf-8"), usedforsecurity=False).hexdigest().upper()
     prefix, suffix = sha1[:5], sha1[5:]
     response = requests.get(f"https://api.pwnedpasswords.com/range/{prefix}", timeout=10)
     response.raise_for_status()

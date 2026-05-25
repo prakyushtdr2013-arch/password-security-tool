@@ -46,7 +46,7 @@ jobs:
       - name: SonarCloud Scan
         uses: sonarsource/sonarcloud-github-action@v1.12.0
         with:
-          organization: ${{ secrets.SONAR_ORGANIZATION }}
-          token: ${{ secrets.SONAR_TOKEN }}
+          organization: prakyushtdr2013-arch
+          token: 6adf455c0f98375b0d436cfed50fb67873d8184f
           projectKey: password-security-tool
           projectName: Password Security Tool
