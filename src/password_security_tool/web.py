@@ -13,6 +13,7 @@ from flask import (
     session,
     url_for,
 )
+from werkzeug.exceptions import HTTPException
 
 from .auth import AuthError, AuthService, STATUS_ACTIVE, STATUS_DISABLED
 from .core import (
@@ -113,8 +114,7 @@ def _register_routes(app: Flask, auth: AuthService) -> None:
             "csrf_token": session.get("csrf_token"),
         }
 
-    @app.after_request
-    def set_security_headers(response):
+    def _apply_security_headers(response):
         """Set security headers including Content Security Policy."""
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
@@ -132,6 +132,15 @@ def _register_routes(app: Flask, auth: AuthService) -> None:
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         return response
+
+    @app.after_request
+    def set_security_headers(response):
+        return _apply_security_headers(response)
+
+    @app.errorhandler(HTTPException)
+    def handle_http_exception(error):
+        response = error.get_response()
+        return _apply_security_headers(response)
 
     @app.route("/")
     def index() -> Any:
