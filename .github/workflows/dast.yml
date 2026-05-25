@@ -24,10 +24,9 @@ jobs:
 
       - name: Start Flask App
         run: |
-          python app.py &
-          sleep 10  # give it more time to boot
+          python web.py &
+          sleep 10
 
-      # ✅ Confirm app is actually running before ZAP hits it
       - name: Verify App is Running
         run: |
           curl http://localhost:5000 || echo "App not responding!"
@@ -37,7 +36,7 @@ jobs:
         with:
           target: 'http://localhost:5000'
           fail_action: false
-          allow_issue_writing: false   # ✅ fixes permission denied error
+          allow_issue_writing: false
 
       - name: Upload ZAP Report
         uses: actions/upload-artifact@v4
