@@ -4,6 +4,7 @@ from typing import Any, Dict
 
 from flask import (
     Flask,
+    abort,
     flash,
     redirect,
     render_template,
@@ -116,6 +117,14 @@ def _register_routes(app: Flask, auth: AuthService) -> None:
     @app.before_request
     def session_timeout_handler() -> None:
         """Check and enforce session timeout before each request."""
+        if "csrf_token" not in session:
+            session["csrf_token"] = secrets.token_urlsafe(32)
+
+        if request.method == "POST":
+            token = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
+            if not token or token != session.get("csrf_token"):
+                abort(400, "Invalid CSRF token")
+
         auth_token = session.get("auth_token")
         if auth_token:
             active_session = auth.get_session(auth_token)
@@ -130,6 +139,7 @@ def _register_routes(app: Flask, auth: AuthService) -> None:
         return {
             "current_user": active.username if active else None,
             "current_role": active.role if active else None,
+            "csrf_token": session.get("csrf_token"),
         }
 
     @app.route("/")

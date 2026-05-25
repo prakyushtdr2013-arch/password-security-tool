@@ -9,6 +9,7 @@
       <p>Sign up to access the password analyzer, breach checks, and generator on localhost.</p>
     </div>
     <form class="auth-form" method="post" action="{{ url_for('signup') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
       <label>Username</label>
       <input type="text" name="username" placeholder="username" required />
       <label>Email</label>

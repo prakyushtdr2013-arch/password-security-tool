@@ -9,6 +9,7 @@
       <p>Log in to manage your passwords, analyze strength, and generate secure credentials.</p>
     </div>
     <form class="auth-form" method="post" action="{{ url_for('login') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
       <label>Username</label>
       <input type="text" name="username" placeholder="username" required />
       <label>Password</label>

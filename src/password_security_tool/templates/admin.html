@@ -57,12 +57,14 @@
                 <td class="action-cell">
                   {% if user.username != 'admin' %}
                     <form method="post" class="inline-action-form">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                       <input type="hidden" name="target_user" value="{{ user.username }}" />
                       <button class="button outline" type="submit" name="admin_action" value="{{ 'enable' if user.status == 'disabled' else 'disable' }}">
                         {{ 'Enable' if user.status == 'disabled' else 'Disable' }}
                       </button>
                     </form>
                     <form method="post" class="inline-action-form">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
                       <input type="hidden" name="target_user" value="{{ user.username }}" />
                       <input type="hidden" name="role" value="{{ 'admin' if user.role == 'user' else 'user' }}" />
                       <button class="button outline" type="submit" name="admin_action" value="set_role">
@@ -84,6 +86,7 @@
       <h2>Password policy</h2>
       <p class="muted">Update password complexity requirements and lockout parameters for new registrations.</p>
       <form method="post" class="admin-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
         <div class="policy-grid">
           <label>
             Minimum length

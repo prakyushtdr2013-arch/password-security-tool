@@ -7,6 +7,7 @@
     <h1>Analyze Password Strength</h1>
     <p>Enter a password to see entropy, complexity, and breach checks.</p>
     <form class="tool-form" method="post" action="{{ url_for('analyze') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
       <label>Password</label>
       <input type="password" name="password" value="{{ password }}" placeholder="Enter password" required />
       <button type="submit">Analyze</button>

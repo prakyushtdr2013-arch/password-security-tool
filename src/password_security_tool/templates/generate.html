@@ -8,6 +8,7 @@
     <p>Build a secure password or passphrase with live strength feedback and improvement suggestions.</p>
 
     <form class="tool-form" method="post" action="{{ url_for('generate') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
       <div class="option-grid">
         <div>
           <label id="lengthLabel">Character length</label>

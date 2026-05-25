@@ -7,6 +7,7 @@
     <h1>Have I Been Pwned</h1>
     <p>Check whether a password has appeared in known breach datasets.</p>
     <form class="tool-form" method="post" action="{{ url_for('breach') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
       <label>Password</label>
       <input type="password" name="password" value="{{ password }}" placeholder="Enter password" required />
       <button type="submit">Check Breach</button>
