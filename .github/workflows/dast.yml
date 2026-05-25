@@ -24,12 +24,18 @@ jobs:
 
       - name: Start Flask App
         run: |
-          python web.py &
-          sleep 10
+          python web.py > flask.log 2>&1 &
+          sleep 15
 
-      - name: Verify App is Running
+      # ✅ This will show us WHY flask failed
+      - name: Show Flask Logs
+        run: cat flask.log
+
+      # ✅ This confirms if port is open
+      - name: Check Port 5000
         run: |
-          curl http://localhost:5000 || echo "App not responding!"
+          curl -v http://localhost:5000 || true
+          ss -tlnp | grep 5000 || echo "Port 5000 not open!"
 
       - name: ZAP Baseline Scan
         uses: zaproxy/action-baseline@v0.10.0
@@ -37,6 +43,12 @@ jobs:
           target: 'http://localhost:5000'
           fail_action: false
           allow_issue_writing: false
+
+      - name: Upload Flask Log
+        uses: actions/upload-artifact@v4
+        with:
+          name: flask-log
+          path: flask.log
 
       - name: Upload ZAP Report
         uses: actions/upload-artifact@v4
