@@ -1,16 +1,26 @@
 # Password Security Tool
 
-A Python password security toolkit that combines password strength analysis, breach checking, secure generation, RBAC, and 2FA in a single package.
+A Python password security toolkit for password analysis, breach checking, secure generation, RBAC, 2FA, and demonstration-grade web security controls.
 
-## Key Features
+## Overview
 
-- Registration, login, and role-based access control (RBAC)
-- Email OTP 2FA with production Gmail app-password support and development dry-run mode
-- Password entropy, complexity, dictionary match, substitution, keyboard-pattern, sequential, and repeated-character analysis
-- Have I Been Pwned breach lookups via the k-Anonymity API
-- Secure password generation with configurable length and character sets
-- Hash demonstrations for bcrypt and Argon2
-- Flask-based local web interface with admin and user workflows
+Password Security Tool helps developers and security teams understand password risk with:
+- strength scoring, entropy and crack-time estimation
+- pattern detection and improvement suggestions
+- Have I Been Pwned breach checking
+- secure random password generation
+- bcrypt / Argon2 hash demonstration
+- Flask-based user/admin web interface
+- registration, login, OTP 2FA, and role-based access control
+
+## Features
+
+- CLI commands for analysis, generation, breach lookup, and hash demo
+- Local Flask web application with signup, login, verify OTP, dashboard, analyzer, and generator
+- Admin dashboard with user management, password policy controls, and audit event review
+- Secure default session, cookie, and CSP settings
+- Optional Gmail app-password email delivery for OTPs or dry-run development mode
+- SQLite-backed user, OTP, and session management
 
 ## Installation
 
@@ -18,7 +28,7 @@ A Python password security toolkit that combines password strength analysis, bre
 python -m pip install -e .
 ```
 
-## Quick Start
+## CLI Quick Start
 
 Analyze a password:
 
@@ -38,29 +48,67 @@ Check password breach status:
 python -m password_security_tool.cli check-breach "YourPassword123!"
 ```
 
-Show hash examples:
+Show bcrypt and Argon2 hash output:
 
 ```bash
 python -m password_security_tool.cli hash-demo "YourPassword123!"
 ```
 
-Run the local web UI:
+Run the local web interface:
 
 ```bash
-python -m password_security_tool.cli serve
+python -m password_security_tool.cli serve --host 127.0.0.1 --port 5000
 ```
 
-Open your browser at:
+## Web Interface
+
+Open the app in your browser:
 
 ```text
 http://127.0.0.1:5000
 ```
 
-A demo admin login is available:
+The web UI includes:
+- signup and password-protected login
+- OTP verification for secure authentication
+- password strength analysis and suggestions
+- random password generation
+- admin user management and policy controls
+
+A built-in admin account is created automatically if missing:
 
 ```text
 username: admin
-password: Admin123!
+password: Admin@123456!
+```
+
+## Environment Variables
+
+For production email OTP delivery, set these environment variables:
+
+```powershell
+$env:GMAIL_ADDRESS="youraccount@gmail.com"
+$env:GMAIL_APP_PASSWORD="your-16-character-app-password"
+$env:SECRET_KEY="replace-with-a-long-random-secret"
+$env:PASSWORD_TOOL_DB="password_tool.sqlite3"
+```
+
+When Gmail credentials are not configured, OTPs run in development dry-run mode and are displayed in the UI/CLI for testing.
+
+## Project Structure
+
+- `src/password_security_tool/cli.py` — command-line entrypoint
+- `src/password_security_tool/web.py` — Flask web application
+- `src/password_security_tool/auth.py` — registration, login, RBAC, OTP, and session logic
+- `src/password_security_tool/core.py` — password analysis, generation, hashing, and breach lookup
+- `docs/` — usage, authentication, and engine documentation
+
+## Testing
+
+Run the automated test suite:
+
+```bash
+pytest -q
 ```
 
 ## Documentation
@@ -70,11 +118,7 @@ password: Admin123!
 - [Password analysis engine](docs/password_analysis_engine.md)
 - [Documentation index](docs/index.md)
 
-## Development
+## License
 
-Run tests with:
-
-```bash
-pytest -q
-```
+This project is licensed under the MIT License.
 
