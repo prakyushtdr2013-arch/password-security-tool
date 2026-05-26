@@ -17,5 +17,8 @@
       <button type="submit">Login</button>
       <p class="form-foot">New here? <a href="{{ url_for('signup') }}">Create an account</a>.</p>
     </form>
+    <form>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+    </form>
   </section>
 {% endblock %}
