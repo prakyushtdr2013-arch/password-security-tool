@@ -30,40 +30,42 @@ from .core import (
 )
 
 
+def _current_session(auth: AuthService) -> Any:
+    """Get the current authenticated session from the request."""
+    return auth.get_session(session.get("auth_token"))
+
+
 def _current_user(auth: AuthService) -> Any:
     """Get the current authenticated user from session."""
-    auth_token = session.get("auth_token")
-    if auth_token:
-        return auth.get_session(auth_token)
-    return None
+    active_session = _current_session(auth)
+    return auth.get_user(active_session.username) if active_session else None
 
 
-def _current_session(auth: AuthService) -> Any:
-    """Get the current session object."""
-    return _current_user(auth)
+def _require_auth(auth: AuthService):
+    """Decorator factory to require authentication."""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not _current_user(auth):
+                flash("You must be logged in to access this page.", "warning")
+                return redirect(url_for("login"))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
 
-def _require_auth(f):
-    """Decorator to require authentication."""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not _current_user(auth):
-            flash("You must be logged in to access this page.", "warning")
-            return redirect(url_for("login"))
-        return f(*args, **kwargs)
-    return decorated_function
-
-
-def _require_admin(f):
-    """Decorator to require admin role."""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        user = _current_user(auth)
-        if not user or user.role != ROLE_ADMIN:
-            flash("You do not have permission to access this page.", "danger")
-            abort(403)
-        return f(*args, **kwargs)
-    return decorated_function
+def _require_admin(auth: AuthService):
+    """Decorator factory to require admin role."""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            user = _current_user(auth)
+            if not user or user.role != ROLE_ADMIN:
+                flash("You do not have permission to access this page.", "danger")
+                abort(403)
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
 
 def _configure_app(app: Flask) -> None:
@@ -77,9 +79,7 @@ def _configure_app(app: Flask) -> None:
 
 def _ensure_admin_user(auth: AuthService) -> None:
     """Ensure admin user exists."""
-    try:
-        auth.get_user("admin")
-    except AuthError:
+    if not auth.get_user("admin"):
         auth.register_user("admin", "admin@example.com", "Admin@123456!", role=ROLE_ADMIN)
 
 
@@ -192,13 +192,13 @@ def _register_routes(app: Flask, auth: AuthService) -> None:
         if not pending_username:
             flash("Please log in first.", "warning")
             return redirect(url_for("login"))
-        
+
         if request.method == "POST":
             otp = request.form["otp"].strip()
             try:
-                auth_token = auth.verify_otp(pending_username, otp)
+                session_info = auth.verify_login_otp(pending_username, otp)
                 session.clear()
-                session["auth_token"] = auth_token
+                session["auth_token"] = session_info.token
                 flash("Logged in successfully!", "success")
                 return redirect(url_for("dashboard"))
             except AuthError as exc:
@@ -207,43 +207,121 @@ def _register_routes(app: Flask, auth: AuthService) -> None:
 
     @app.route("/logout")
     def logout() -> Any:
+        auth.logout(session.get("auth_token"))
         session.clear()
         flash("Logged out successfully.", "success")
         return redirect(url_for("login"))
 
     @app.route("/dashboard")
-    @_require_auth
+    @_require_auth(auth)
     def dashboard() -> Any:
         user = _current_user(auth)
         return render_template("dashboard.html", user=user)
 
     @app.route("/analyze", methods=["GET", "POST"])
-    @_require_auth
+    @_require_auth(auth)
     def analyze() -> Any:
-        result = None
+        analysis = None
+        breach_count = None
+        password = ""
         if request.method == "POST":
             password = request.form.get("password", "")
             if password:
-                result = {
+                score = complexity_score(password)
+                analysis = {
                     "password": password,
-                    "strength": strength_meter(password),
+                    "strength": strength_meter(score),
                     "entropy": calculate_entropy(password),
-                    "complexity_score": complexity_score(password),
+                    "score": score,
                     "patterns": detect_patterns(password),
-                    "crack_time": estimate_crack_time(password),
                     "suggestions": suggest_improvements(password),
                 }
-        return render_template("analyze.html", result=result)
+                crack_time, crack_unit = estimate_crack_time(password)
+                analysis["crack_time"] = crack_time
+                analysis["crack_unit"] = crack_unit
+                try:
+                    breach_count = pwned_passwords_count(password)
+                except Exception:
+                    flash("Unable to check breach status at this time.", "danger")
+        return render_template("analyze.html", analysis=analysis, breach_count=breach_count, password=password)
 
-    @app.route("/generate")
-    @_require_auth
+    @app.route("/breach", methods=["GET", "POST"])
+    @_require_auth(auth)
+    def breach() -> Any:
+        breach_count = None
+        password = ""
+        if request.method == "POST":
+            password = request.form.get("password", "")
+            if password:
+                try:
+                    breach_count = pwned_passwords_count(password)
+                except Exception:
+                    flash("Unable to check breach status at this time.", "danger")
+        return render_template("breach.html", breach_count=breach_count, password=password)
+
+    @app.route("/generate", methods=["GET", "POST"])
+    @_require_auth(auth)
     def generate() -> Any:
-        length = request.args.get("length", 16, type=int)
-        password = generate_password(length=max(8, min(length, 128)))
-        return render_template("generate.html", generated_password=password)
+        options = {
+            "length": 16,
+            "upper": True,
+            "lower": True,
+            "digits": True,
+            "symbols": True,
+            "exclude_ambiguous": False,
+            "passphrase": False,
+        }
+        generated_password = ""
+        analysis = None
 
-    @app.route("/admin")
-    @_require_admin
+        if request.method == "POST":
+            try:
+                options["length"] = int(request.form.get("length", options["length"]))
+            except (TypeError, ValueError):
+                options["length"] = options["length"]
+            options["passphrase"] = bool(request.form.get("passphrase"))
+            options["upper"] = bool(request.form.get("upper"))
+            options["lower"] = bool(request.form.get("lower"))
+            options["digits"] = bool(request.form.get("digits"))
+            options["symbols"] = bool(request.form.get("symbols"))
+            options["exclude_ambiguous"] = bool(request.form.get("exclude_ambiguous"))
+            try:
+                generated_password = generate_password(
+                    length=max(8, min(options["length"], 128)),
+                    upper=options["upper"],
+                    lower=options["lower"],
+                    digits=options["digits"],
+                    symbols=options["symbols"],
+                    exclude_ambiguous=options["exclude_ambiguous"],
+                    passphrase=options["passphrase"],
+                )
+                score = complexity_score(generated_password)
+                analysis = {
+                    "score": score,
+                    "strength": strength_meter(score),
+                    "entropy": calculate_entropy(generated_password),
+                }
+                crack_time, crack_unit = estimate_crack_time(generated_password)
+                analysis["crack_time"] = crack_time
+                analysis["crack_unit"] = crack_unit
+            except Exception as exc:
+                flash(str(exc), "danger")
+
+        return render_template(
+            "generate.html",
+            generated_password=generated_password,
+            options=options,
+            analysis=analysis,
+        )
+
+    @app.route("/profile")
+    @_require_auth(auth)
+    def profile() -> Any:
+        user = _current_user(auth)
+        return render_template("profile.html", user=user)
+
+    @app.route("/admin", methods=["GET", "POST"])
+    @_require_admin(auth)
     def admin() -> Any:
         users = auth.list_users()
         policy = auth.get_password_policy()
