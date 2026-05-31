@@ -30,133 +30,174 @@
     </div>
   </section>
 
-  <section class="content-card admin-grid">
-    <div class="panel-card">
-      <h2>User management</h2>
-      <p class="muted">Enable, disable, or change roles for registered accounts.</p>
-      <div class="table-responsive">
-        <table class="admin-table">
-          <thead>
-            <tr>
-              <th>Username</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th>Last login</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for user in users %}
+  <section class="content-card admin-tabs-card">
+    <div class="tabs-header">
+      <button class="tab-button active" type="button" data-tab="user-management">User management</button>
+      <button class="tab-button" type="button" data-tab="audit-events">Audit events</button>
+      <button class="tab-button" type="button" data-tab="password-policy">Password policy</button>
+    </div>
+
+    <div class="tab-panel active" id="user-management">
+      <div class="panel-card">
+        <h2>User management</h2>
+        <p class="muted">Manage accounts, roles, lock states, and recovery actions for registered users.</p>
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
               <tr>
-                <td>{{ user.username }}</td>
-                <td>{{ user.email }}</td>
-                <td>{{ user.role }}</td>
-                <td><span class="status-tag status-{{ user.status }}">{{ user.status }}</span></td>
-                <td>{{ user.last_login or 'Never' }}</td>
-                <td class="action-cell">
-                  {% if user.username != 'admin' %}
-                    <form method="post" class="inline-action-form">
-                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-                      <input type="hidden" name="target_user" value="{{ user.username }}" />
-                      <button class="button outline" type="submit" name="admin_action" value="{{ 'enable' if user.status == 'disabled' else 'disable' }}">
-                        {{ 'Enable' if user.status == 'disabled' else 'Disable' }}
-                      </button>
-                    </form>
-                    <form method="post" class="inline-action-form">
-                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-                      <input type="hidden" name="target_user" value="{{ user.username }}" />
-                      <input type="hidden" name="role" value="{{ 'admin' if user.role == 'user' else 'user' }}" />
-                      <button class="button outline" type="submit" name="admin_action" value="set_role">
-                        Set {{ 'admin' if user.role == 'user' else 'user' }}
-                      </button>
-                    </form>
-                  {% else %}
-                    <span class="muted">Protected</span>
-                  {% endif %}
-                </td>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Locked</th>
+                <th>Last login</th>
+                <th>Actions</th>
               </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {% for user in users %}
+                <tr>
+                  <td>{{ user.username }}</td>
+                  <td>{{ user.email }}</td>
+                  <td>{{ user.role }}</td>
+                  <td><span class="status-tag status-{{ user.status }}">{{ user.status }}</span></td>
+                  <td>{{ 'Yes' if user.is_locked else 'No' }}</td>
+                  <td>{{ user.last_login or 'Never' }}</td>
+                  <td class="action-cell">
+                    {% if user.username != 'admin' %}
+                      <form method="post" class="inline-action-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                        <input type="hidden" name="target_user" value="{{ user.username }}" />
+                        <button class="button outline" type="submit" name="admin_action" value="{{ 'unlock' if user.is_locked else 'lock' }}">
+                          {{ 'Unlock' if user.is_locked else 'Lock' }}
+                        </button>
+                      </form>
+                      <form method="post" class="inline-action-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                        <input type="hidden" name="target_user" value="{{ user.username }}" />
+                        <button class="button outline" type="submit" name="admin_action" value="{{ 'enable' if user.status == 'disabled' else 'disable' }}">
+                          {{ 'Enable' if user.status == 'disabled' else 'Disable' }}
+                        </button>
+                      </form>
+                      <form method="post" class="inline-action-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                        <input type="hidden" name="target_user" value="{{ user.username }}" />
+                        <input type="hidden" name="role" value="{{ 'admin' if user.role == 'user' else 'user' }}" />
+                        <button class="button outline" type="submit" name="admin_action" value="set_role">
+                          Set {{ 'admin' if user.role == 'user' else 'user' }}
+                        </button>
+                      </form>
+                      <form method="post" class="inline-action-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+                        <input type="hidden" name="target_user" value="{{ user.username }}" />
+                        <button class="button outline danger" type="submit" name="admin_action" value="delete" onclick="return confirm('Delete user {{ user.username }}? This cannot be undone.')">
+                          Delete
+                        </button>
+                      </form>
+                    {% else %}
+                      <span class="muted">Protected</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
-    <div class="panel-card">
-      <h2>Password policy</h2>
-      <p class="muted">Update password complexity requirements and lockout parameters for new registrations.</p>
-      <form method="post" class="admin-form">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
-        <div class="policy-grid">
-          <label>
-            Minimum length
-            <input type="number" name="minimum_length" min="8" value="{{ policy.minimum_length }}" />
-          </label>
-          <label>
-            Minimum entropy
-            <input type="number" name="minimum_entropy" min="40" value="{{ policy.minimum_entropy }}" />
-          </label>
-          <label class="checkbox-label full-width">
-            <input type="checkbox" name="require_uppercase"{% if policy.require_uppercase %} checked{% endif %} />
-            Require uppercase letters
-          </label>
-          <label class="checkbox-label full-width">
-            <input type="checkbox" name="require_lowercase"{% if policy.require_lowercase %} checked{% endif %} />
-            Require lowercase letters
-          </label>
-          <label class="checkbox-label full-width">
-            <input type="checkbox" name="require_numbers"{% if policy.require_numbers %} checked{% endif %} />
-            Require numbers
-          </label>
-          <label class="checkbox-label full-width">
-            <input type="checkbox" name="require_special_characters"{% if policy.require_special_characters %} checked{% endif %} />
-            Require special characters
-          </label>
-          <label class="checkbox-label full-width">
-            <input type="checkbox" name="block_common_passwords"{% if policy.block_common_passwords %} checked{% endif %} />
-            Block common passwords
-          </label>
-          <label>
-            Lockout threshold
-            <input type="number" name="lockout_threshold" min="1" value="{{ policy.lockout_threshold }}" />
-          </label>
-          <label>
-            Lockout duration (minutes)
-            <input type="number" name="lockout_duration_minutes" min="1" value="{{ policy.lockout_duration_minutes }}" />
-          </label>
+    <div class="tab-panel" id="audit-events">
+      <div class="panel-card">
+        <h2>Recent audit events</h2>
+        <p class="muted">Track administrative changes and authentication activity.</p>
+        <div class="table-responsive">
+          <table class="admin-table audit-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Event</th>
+                <th>Actor</th>
+                <th>Subject</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for event in audit_events %}
+                <tr>
+                  <td>{{ event.created_at }}</td>
+                  <td>{{ event.event_type }}</td>
+                  <td>{{ event.actor_username or 'System' }}</td>
+                  <td>{{ event.subject_username or 'N/A' }}</td>
+                  <td>{{ event.details or '—' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
-        <input type="hidden" name="admin_action" value="update_policy" />
-        <button class="button primary" type="submit">Save policy</button>
-      </form>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="password-policy">
+      <div class="panel-card">
+        <h2>Password policy</h2>
+        <p class="muted">Update password complexity requirements and lockout parameters for new registrations.</p>
+        <form method="post" class="admin-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <div class="policy-grid">
+            <label>
+              Minimum length
+              <input type="number" name="minimum_length" min="8" value="{{ policy.minimum_length }}" />
+            </label>
+            <label>
+              Minimum entropy
+              <input type="number" name="minimum_entropy" min="40" value="{{ policy.minimum_entropy }}" />
+            </label>
+            <label class="checkbox-label full-width">
+              <input type="checkbox" name="require_uppercase"{% if policy.require_uppercase %} checked{% endif %} />
+              Require uppercase letters
+            </label>
+            <label class="checkbox-label full-width">
+              <input type="checkbox" name="require_lowercase"{% if policy.require_lowercase %} checked{% endif %} />
+              Require lowercase letters
+            </label>
+            <label class="checkbox-label full-width">
+              <input type="checkbox" name="require_numbers"{% if policy.require_numbers %} checked{% endif %} />
+              Require numbers
+            </label>
+            <label class="checkbox-label full-width">
+              <input type="checkbox" name="require_special_characters"{% if policy.require_special_characters %} checked{% endif %} />
+              Require special characters
+            </label>
+            <label class="checkbox-label full-width">
+              <input type="checkbox" name="block_common_passwords"{% if policy.block_common_passwords %} checked{% endif %} />
+              Block common passwords
+            </label>
+            <label>
+              Lockout threshold
+              <input type="number" name="lockout_threshold" min="1" value="{{ policy.lockout_threshold }}" />
+            </label>
+            <label>
+              Lockout duration (minutes)
+              <input type="number" name="lockout_duration_minutes" min="1" value="{{ policy.lockout_duration_minutes }}" />
+            </label>
+          </div>
+          <input type="hidden" name="admin_action" value="update_policy" />
+          <button class="button primary" type="submit">Save policy</button>
+        </form>
+      </div>
     </div>
   </section>
 
-  <section class="content-card panel-card">
-    <h2>Recent audit events</h2>
-    <p class="muted">Track administrative changes and authentication activity.</p>
-    <div class="table-responsive">
-      <table class="admin-table audit-table">
-        <thead>
-          <tr>
-            <th>Time</th>
-            <th>Event</th>
-            <th>Actor</th>
-            <th>Subject</th>
-            <th>Details</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for event in audit_events %}
-            <tr>
-              <td>{{ event.created_at }}</td>
-              <td>{{ event.event_type }}</td>
-              <td>{{ event.actor_username or 'System' }}</td>
-              <td>{{ event.subject_username or 'N/A' }}</td>
-              <td>{{ event.details or '—' }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </section>
+  <script>
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabPanels = document.querySelectorAll('.tab-panel');
+
+    tabButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const target = button.dataset.tab;
+        tabButtons.forEach((btn) => btn.classList.toggle('active', btn === button));
+        tabPanels.forEach((panel) => panel.classList.toggle('active', panel.id === target));
+      });
+    });
+  </script>
 {% endblock %}

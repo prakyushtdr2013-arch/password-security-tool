@@ -97,3 +97,15 @@ def test_admin_user_management_and_audit_events(tmp_path):
 
     events = auth.get_recent_audit_events(10)
     assert any(event["event_type"] == "user_status_changed" for event in events)
+
+
+def test_admin_delete_user_and_audit_event(tmp_path):
+    auth, _ = build_auth(tmp_path)
+    auth.register_user("admin", "admin@example.com", "Admin!Passw0rd", role=ROLE_ADMIN, algorithm="bcrypt")
+    auth.register_user("charlie", "charlie@example.com", "S3cure!Passw0rd", algorithm="bcrypt")
+
+    auth.delete_user("charlie", actor_user_id=1)
+    assert auth.get_user("charlie") is None
+
+    events = auth.get_recent_audit_events(10)
+    assert any(event["event_type"] == "user_deleted" for event in events)

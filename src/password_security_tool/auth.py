@@ -316,8 +316,42 @@ class AuthService:
             raise AuthError("User not found.")
         with self._connection() as conn:
             conn.execute("UPDATE users SET status = ?, updated_at = ? WHERE id = ?", (status, _to_iso(_utc_now()), user.id))
-        self.record_audit_event("user_status_changed", actor_user_id=user.id, subject_user_id=user.id, details=f"Status set to {status}")
+        self.record_audit_event("user_status_changed", actor_user_id=actor_user_id, subject_user_id=user.id, details=f"Status set to {status}")
         return self.get_user(username)
+
+    def lock_user(self, username: str, actor_user_id: int | None = None, duration_minutes: int = 60) -> AuthUser:
+        user = self.get_user(username)
+        if not user:
+            raise AuthError("User not found.")
+        locked_until = _to_iso(_utc_now() + timedelta(minutes=duration_minutes))
+        with self._connection() as conn:
+            conn.execute("UPDATE users SET locked_until = ?, updated_at = ? WHERE id = ?", (locked_until, _to_iso(_utc_now()), user.id))
+        self.record_audit_event("user_locked", actor_user_id=actor_user_id, subject_user_id=user.id, details=f"Locked for {duration_minutes} minutes.")
+        return self.get_user(username)
+
+    def unlock_user(self, username: str, actor_user_id: int | None = None) -> AuthUser:
+        user = self.get_user(username)
+        if not user:
+            raise AuthError("User not found.")
+        with self._connection() as conn:
+            conn.execute("UPDATE users SET locked_until = NULL, failed_attempts = 0, updated_at = ? WHERE id = ?", (_to_iso(_utc_now()), user.id))
+        self.record_audit_event("user_unlocked", actor_user_id=actor_user_id, subject_user_id=user.id, details="Unlocked by admin.")
+        return self.get_user(username)
+
+    def delete_user(self, username: str, actor_user_id: int | None = None) -> None:
+        user = self.get_user(username)
+        if not user:
+            raise AuthError("User not found.")
+        self.record_audit_event(
+            "user_deleted",
+            actor_user_id=actor_user_id,
+            subject_user_id=user.id,
+            details="User account deleted by admin.",
+        )
+        with self._connection() as conn:
+            conn.execute("DELETE FROM sessions WHERE user_id = ?", (user.id,))
+            conn.execute("DELETE FROM user_otps WHERE user_id = ?", (user.id,))
+            conn.execute("DELETE FROM users WHERE id = ?", (user.id,))
 
     def get_active_session_count(self) -> int:
         with self._connection() as conn:
