@@ -92,6 +92,40 @@
           }
         });
       }
+
+      function setupPasswordToggles() {
+        document.querySelectorAll('.show-password-toggle').forEach((button) => {
+          const row = button.closest('.password-row');
+          if (!row) return;
+          const input = row.querySelector('.password-input');
+          if (!input) return;
+
+          button.addEventListener('click', () => {
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+            button.classList.toggle('visible', isPassword);
+            button.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+            button.setAttribute('title', isPassword ? 'Hide password' : 'Show password');
+          });
+        });
+      }
+
+      function setupAnalyzerPreview() {
+        const input = document.querySelector('.analyze-password-input');
+        const preview = document.getElementById('passwordPreview');
+        if (!input || !preview) return;
+
+        const updatePreview = () => {
+          const text = input.value.trim();
+          preview.textContent = text || 'Nothing entered yet';
+        };
+
+        input.addEventListener('input', updatePreview);
+        updatePreview();
+      }
+
+      setupPasswordToggles();
+      setupAnalyzerPreview();
     </script>
   </body>
 </html>

@@ -19,6 +19,7 @@ from .auth import AuthError, AuthService, STATUS_ACTIVE, STATUS_DISABLED
 from .core import (
     ROLE_ADMIN,
     ROLE_USER,
+    analyze_password_strength,
     calculate_entropy,
     complexity_score,
     detect_patterns,
@@ -227,14 +228,15 @@ def _register_routes(app: Flask, auth: AuthService) -> None:
         if request.method == "POST":
             password = request.form.get("password", "")
             if password:
-                score = complexity_score(password)
+                analysis_result = analyze_password_strength(password)
                 analysis = {
                     "password": password,
-                    "strength": strength_meter(score),
-                    "entropy": calculate_entropy(password),
-                    "score": score,
-                    "patterns": detect_patterns(password),
-                    "suggestions": suggest_improvements(password),
+                    "strength": analysis_result.strength,
+                    "entropy": analysis_result.entropy,
+                    "score": analysis_result.score,
+                    "patterns": analysis_result.patterns,
+                    "suggestions": analysis_result.suggestions,
+                    "is_dictionary_match": analysis_result.is_dictionary_match,
                 }
                 crack_time, crack_unit = estimate_crack_time(password)
                 analysis["crack_time"] = crack_time
@@ -244,6 +246,44 @@ def _register_routes(app: Flask, auth: AuthService) -> None:
                 except Exception:
                     flash("Unable to check breach status at this time.", "danger")
         return render_template("analyze.html", analysis=analysis, breach_count=breach_count, password=password)
+
+    @app.route("/api/analyze", methods=["POST"])
+    @_require_auth(auth)
+    def api_analyze() -> Any:
+        data = request.get_json(silent=True) or {}
+        password = data.get("password", "")
+        if not isinstance(password, str):
+            password = ""
+
+        score = complexity_score(password) if password else 0
+        analysis = {
+            "strength": strength_meter(score),
+            "entropy": calculate_entropy(password) if password else 0,
+            "score": score,
+            "crack_time": 0,
+            "crack_unit": "seconds",
+            "patterns": [],
+            "suggestions": [],
+            "breach_count": None,
+        }
+
+        if password:
+            analysis_result = analyze_password_strength(password)
+            analysis["entropy"] = analysis_result.entropy
+            analysis["score"] = analysis_result.score
+            analysis["strength"] = analysis_result.strength
+            analysis["patterns"] = analysis_result.patterns
+            analysis["suggestions"] = analysis_result.suggestions
+            analysis["is_dictionary_match"] = analysis_result.is_dictionary_match
+            crack_time, crack_unit = estimate_crack_time(password)
+            analysis["crack_time"] = crack_time
+            analysis["crack_unit"] = crack_unit
+            try:
+                analysis["breach_count"] = pwned_passwords_count(password)
+            except Exception:
+                analysis["breach_count"] = None
+
+        return analysis
 
     @app.route("/breach", methods=["GET", "POST"])
     @_require_auth(auth)

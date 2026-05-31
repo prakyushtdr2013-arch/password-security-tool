@@ -9,9 +9,70 @@
     <form class="tool-form" method="post" action="{{ url_for('analyze') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
       <label>Password</label>
-      <input type="password" name="password" value="{{ password }}" placeholder="Enter password" required />
-      <button type="submit">Analyze</button>
+      <div class="password-row">
+        <input class="password-input analyze-password-input" type="password" name="password" value="{{ password }}" placeholder="Enter password" required />
+        <button type="button" class="show-password-toggle" aria-label="Show password" title="Show password">
+          <span class="eye-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </span>
+          <span class="eye-slash-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12c1.67 4.7 5.4 7.5 9.5 7.5 1.5 0 2.88-.3 4.12-.85"/><path d="M9.88 9.88a3.75 3.75 0 014.24 4.24"/><path d="M1 1l22 22"/><path d="M21.5 12c-1.67 4.7-5.4 7.5-9.5 7.5-1.5 0-2.88-.3-4.12-.85"/></svg>
+          </span>
+        </button>
+      </div>
     </form>
+
+    <div class="live-analysis-panel">
+      <div class="live-analysis-header">
+        <div>
+          <h3>Instant password strength</h3>
+          <p class="muted">Strength, entropy, and suggestions update as you type.</p>
+        </div>
+      </div>
+
+      <div class="analysis-strength-meter">
+        <div class="meter-heading">
+          <span>Visual strength</span>
+          <span class="meter-status weak" id="liveStrengthLabel">Weak</span>
+        </div>
+        <div class="meter-track">
+          <div class="meter-fill weak" id="liveStrengthFill" style="width: 0%;"></div>
+        </div>
+        <div class="meter-legend">
+          <span>Weak</span>
+          <span>Moderate</span>
+          <span>Strong</span>
+        </div>
+      </div>
+
+      <div class="result-grid live-result-grid">
+        <div class="result-card">
+          <strong>Entropy</strong>
+          <p id="liveEntropy">0 bits</p>
+        </div>
+        <div class="result-card">
+          <strong>Strength score</strong>
+          <p id="liveScore">0 / 100</p>
+        </div>
+        <div class="result-card">
+          <strong>Crack time</strong>
+          <p id="liveCrackTime">Estimate only</p>
+        </div>
+        <div class="result-card">
+          <strong>Dictionary risk</strong>
+          <p id="liveDictionaryRisk">Checking…</p>
+        </div>
+        <div class="result-card">
+          <strong>Breach hits</strong>
+          <p id="liveBreachCount">Checking…</p>
+        </div>
+      </div>
+
+      <div class="result-details">
+        <h3>Suggestions</h3>
+        <ul id="liveSuggestions"><li>Type a password to see instant feedback.</li></ul>
+      </div>
+    </div>
 
     {% if analysis %}
       <div class="result-panel">
@@ -22,6 +83,22 @@
           </div>
           <div class="badge badge-score">{{ analysis.score }} / 100</div>
         </div>
+
+        <div class="analysis-strength-meter">
+          <div class="meter-heading">
+            <span>Visual strength</span>
+            <span class="meter-status {{ analysis.strength|lower }}">{{ analysis.strength }}</span>
+          </div>
+          <div class="meter-track">
+            <div class="meter-fill {{ analysis.strength|lower }}" style="width: {{ analysis.score }}%;"></div>
+          </div>
+          <div class="meter-legend">
+            <span>Weak</span>
+            <span>Moderate</span>
+            <span>Strong</span>
+          </div>
+        </div>
+
         <div class="result-grid">
           <div class="result-card">
             <strong>Entropy</strong>
@@ -32,6 +109,10 @@
             <p>{{ analysis.crack_time }} {{ analysis.crack_unit }}</p>
           </div>
           <div class="result-card">
+            <strong>Dictionary attack</strong>
+            <p>{{ 'Yes' if analysis.is_dictionary_match else 'No' }}</p>
+          </div>
+          <div class="result-card">
             <strong>Breach hits</strong>
             <p>{{ breach_count }}</p>
           </div>
@@ -39,10 +120,162 @@
         <div class="result-details">
           <h3>Detected patterns</h3>
           <p>{{ analysis.patterns | join(', ') if analysis.patterns else 'None' }}</p>
+          <h3>Dictionary attack simulation</h3>
+          <p>{{ 'Matches common-password dictionary or substitution patterns' if analysis.is_dictionary_match else 'No dictionary match detected' }}</p>
           <h3>Suggestions</h3>
           <ul>{% for suggestion in analysis.suggestions %}<li>{{ suggestion }}</li>{% endfor %}</ul>
         </div>
       </div>
     {% endif %}
   </section>
+
+  <script>
+    const livePasswordInput = document.querySelector('.analyze-password-input');
+    const liveStrengthLabel = document.getElementById('liveStrengthLabel');
+    const liveStrengthFill = document.getElementById('liveStrengthFill');
+    const liveEntropy = document.getElementById('liveEntropy');
+    const liveCrackTime = document.getElementById('liveCrackTime');
+    const liveBreachCount = document.getElementById('liveBreachCount');
+    const liveDictionaryRisk = document.getElementById('liveDictionaryRisk');
+    const liveScore = document.getElementById('liveScore');
+    const liveSuggestions = document.getElementById('liveSuggestions');
+    const csrfToken = "{{ csrf_token }}";
+
+    function calculateEntropy(password) {
+      let charsetSize = 0;
+      if (/[a-z]/.test(password)) charsetSize += 26;
+      if (/[A-Z]/.test(password)) charsetSize += 26;
+      if (/[0-9]/.test(password)) charsetSize += 10;
+      if (/[^A-Za-z0-9]/.test(password)) charsetSize += 32;
+      if (!charsetSize || password.length === 0) return 0;
+      return Math.round(password.length * Math.log2(charsetSize));
+    }
+
+    function complexityScore(password) {
+      const entropy = calculateEntropy(password);
+      const lengthBonus = Math.min(Math.max(password.length - 8, 0), 20);
+      const variety = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].reduce((acc, rx) => acc + (rx.test(password) ? 1 : 0), 0);
+      let score = Math.min(Math.max(entropy / 2 + lengthBonus + variety * 10, 0), 100);
+      if (/^(password|123456|qwerty|letmein|admin)$/i.test(password)) score = Math.min(score, 20);
+      return Math.round(score);
+    }
+
+    function strengthLabel(score) {
+      if (score < 35) return 'Weak';
+      if (score < 65) return 'Moderate';
+      return 'Strong';
+    }
+
+    function estimateCrackTime(score) {
+      if (score < 30) return 'Seconds';
+      if (score < 55) return 'Minutes';
+      if (score < 75) return 'Hours';
+      if (score < 90) return 'Days';
+      return 'Years';
+    }
+
+    function suggestImprovements(password) {
+      const suggestions = [];
+      if (password.length < 12) suggestions.push('Increase length to 12 or more characters.');
+      if (!/[A-Z]/.test(password)) suggestions.push('Add uppercase letters.');
+      if (!/[a-z]/.test(password)) suggestions.push('Add lowercase letters.');
+      if (!/[0-9]/.test(password)) suggestions.push('Add digits.');
+      if (!/[^A-Za-z0-9]/.test(password)) suggestions.push('Add symbols or punctuation.');
+      if (/^(password|123456|qwerty|letmein|admin)$/i.test(password)) suggestions.push('Avoid common passwords or simple dictionary words.');
+      if (/(.)\1{2,}/.test(password) || /(0123|1234|2345|3456|4567|5678|6789)/.test(password) || /qwerty|asdfgh|zxcvbn/i.test(password)) {
+        suggestions.push('Avoid repeated characters, numeric sequences, and keyboard patterns.');
+      }
+      return suggestions;
+    }
+
+    function updateLiveAnalysis() {
+      if (!livePasswordInput) return;
+      const password = livePasswordInput.value.trim();
+      const score = complexityScore(password);
+      const label = strengthLabel(score);
+      liveStrengthLabel.textContent = label;
+      liveStrengthLabel.className = `meter-status ${label.toLowerCase()}`;
+      liveStrengthFill.className = `meter-fill ${label.toLowerCase()}`;
+      liveStrengthFill.style.width = `${password ? score : 0}%`;
+      liveEntropy.textContent = `${calculateEntropy(password)} bits`;
+      liveScore.textContent = `${score} / 100`;
+      liveCrackTime.textContent = password ? estimateCrackTime(score) : 'Estimate only';
+
+      const suggestions = password ? suggestImprovements(password) : ['Type a password to see instant feedback.'];
+      liveSuggestions.innerHTML = suggestions.length ? `<li>${suggestions.join('</li><li>')}</li>` : '<li>Nice work — this password is strong.</li>';
+
+      if (password) {
+        liveBreachCount.textContent = 'Checking…';
+        liveDictionaryRisk.textContent = 'Checking…';
+        debouncedFetchAnalysis(password);
+      } else {
+        liveBreachCount.textContent = 'N/A';
+        liveDictionaryRisk.textContent = 'N/A';
+      }
+    }
+
+    function debounce(fn, delay) {
+      let timeoutId;
+      return (...args) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => fn(...args), delay);
+      };
+    }
+
+    async function fetchLiveAnalysis(password) {
+      try {
+        const response = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken,
+          },
+          body: JSON.stringify({ password }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Fetch failed');
+        }
+
+        const data = await response.json();
+        const score = data.score || 0;
+        const label = data.strength || strengthLabel(score);
+
+        liveStrengthLabel.textContent = label;
+        liveStrengthLabel.className = `meter-status ${label.toLowerCase()}`;
+        liveStrengthFill.className = `meter-fill ${label.toLowerCase()}`;
+        liveStrengthFill.style.width = `${score}%`;
+        liveEntropy.textContent = `${Math.round(data.entropy || 0)} bits`;
+        liveScore.textContent = `${score} / 100`;
+        liveCrackTime.textContent = password ? `${data.crack_time} ${data.crack_unit}` : 'Estimate only';
+        liveDictionaryRisk.textContent = data.is_dictionary_match ? 'Yes' : 'No';
+        liveSuggestions.innerHTML = data.suggestions && data.suggestions.length ? `<li>${data.suggestions.join('</li><li>')}</li>` : '<li>Nice work — this password is strong.</li>';
+
+        if (data.breach_count === null || data.breach_count === undefined) {
+          liveBreachCount.textContent = 'Unknown';
+        } else {
+          liveBreachCount.textContent = data.breach_count;
+        }
+      } catch (error) {
+        liveBreachCount.textContent = 'Unavailable';
+        liveDictionaryRisk.textContent = 'Unavailable';
+      }
+    }
+
+    const debouncedFetchAnalysis = debounce(fetchLiveAnalysis, 550);
+
+    const analyzeForm = document.querySelector('.tool-form');
+    if (analyzeForm) {
+      analyzeForm.addEventListener('submit', (event) => event.preventDefault());
+    }
+
+    if (livePasswordInput) {
+      livePasswordInput.addEventListener('input', updateLiveAnalysis);
+      if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', updateLiveAnalysis);
+      } else {
+        updateLiveAnalysis();
+      }
+    }
+  </script>
 {% endblock %}

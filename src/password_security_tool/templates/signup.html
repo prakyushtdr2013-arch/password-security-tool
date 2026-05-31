@@ -15,7 +15,17 @@
       <label>Email</label>
       <input type="email" name="email" placeholder="you@example.com" required />
       <label>Password</label>
-      <input type="password" name="password" placeholder="password" required />
+      <div class="password-row">
+        <input class="password-input" type="password" name="password" placeholder="password" required />
+        <button type="button" class="show-password-toggle" aria-label="Show password" title="Show password">
+          <span class="eye-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </span>
+          <span class="eye-slash-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12c1.67 4.7 5.4 7.5 9.5 7.5 1.5 0 2.88-.3 4.12-.85"/><path d="M9.88 9.88a3.75 3.75 0 014.24 4.24"/><path d="M1 1l22 22"/><path d="M21.5 12c-1.67 4.7-5.4 7.5-9.5 7.5-1.5 0-2.88-.3-4.12-.85"/></svg>
+          </span>
+        </button>
+      </div>
       <button type="submit">Sign Up</button>
       <p class="form-foot">Already have an account? <a href="{{ url_for('login') }}">Log in</a>.</p>
     </form>

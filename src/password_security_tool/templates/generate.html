@@ -4,7 +4,7 @@
 
 {% block content %}
   <section class="content-card">
-    <h1>Password Generator & Strength Analyzer</h1>
+    <h1>Password Generator</h1>
     <p>Build a secure password or passphrase with live strength feedback and improvement suggestions.</p>
 
     <form class="tool-form" method="post" action="{{ url_for('generate') }}">
@@ -31,7 +31,7 @@
       <button type="submit">Generate Password</button>
     </form>
 
-    <div class="result-grid">
+    <div class="result-grid single-card">
       <section class="output-card">
         <div class="result-header">
           <div>
@@ -49,41 +49,6 @@
           <span>{{ 'Passphrase' if options.passphrase else 'Password' }}</span>
         </div>
       </section>
-
-      <section class="output-card">
-        <div class="result-header">
-          <div>
-            <h3>Live password preview</h3>
-            <p class="muted">Type or paste a password to analyze strength instantly.</p>
-          </div>
-          <button class="copy-button" type="button" id="copyPreviewButton">Copy</button>
-        </div>
-
-        <label for="passwordInput">Generated / entered password</label>
-        <input id="passwordInput" type="text" value="{{ generated_password }}" placeholder="Enter a password to analyze" />
-
-        <div class="strength-card">
-          <div class="strength-label">Strength</div>
-          <div class="strength-meter">
-            <div class="strength-bar" id="strengthBar"></div>
-          </div>
-          <div class="strength-text" id="strengthText">Start typing to see strength.</div>
-        </div>
-
-        <div class="suggestions" id="suggestionsList">
-          <p class="muted">Suggestions will appear here as you type.</p>
-        </div>
-
-        {% if analysis %}
-          <div class="result-card">
-            <strong>Server analysis</strong>
-            <p>Score: {{ analysis.score }} / 100</p>
-            <p>Strength: {{ analysis.strength }}</p>
-            <p>Entropy: {{ analysis.entropy }} bits</p>
-            <p>Breach estimate: {{ analysis.crack_time }} {{ analysis.crack_unit }}</p>
-          </div>
-        {% endif %}
-      </section>
     </div>
   </section>
 
@@ -91,67 +56,8 @@
     const lengthLabel = document.getElementById('lengthLabel');
     const lengthInput = document.getElementById('lengthInput');
     const passphraseToggle = document.getElementById('passphraseToggle');
-    const passwordInput = document.getElementById('passwordInput');
     const generatedPasswordInput = document.getElementById('generatedPassword');
-    const strengthBar = document.getElementById('strengthBar');
-    const strengthText = document.getElementById('strengthText');
-    const suggestionsList = document.getElementById('suggestionsList');
     const copyGeneratedButton = document.getElementById('copyGeneratedButton');
-    const copyPreviewButton = document.getElementById('copyPreviewButton');
-
-    const AMBIGUOUS = /[Il1O0o]/;
-
-    function calculateEntropy(password) {
-      let charsetSize = 0;
-      if (/[a-z]/.test(password)) charsetSize += 26;
-      if (/[A-Z]/.test(password)) charsetSize += 26;
-      if (/[0-9]/.test(password)) charsetSize += 10;
-      if (/[^A-Za-z0-9]/.test(password)) charsetSize += 32;
-      if (!charsetSize || password.length === 0) return 0;
-      return Math.round(password.length * Math.log2(charsetSize));
-    }
-
-    function complexityScore(password) {
-      const entropy = calculateEntropy(password);
-      const lengthBonus = Math.min(Math.max(password.length - 8, 0), 20);
-      const variety = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].reduce((acc, rx) => acc + (rx.test(password) ? 1 : 0), 0);
-      let score = Math.min(Math.max(entropy / 2 + lengthBonus + variety * 10, 0), 100);
-      if (/^(password|123456|qwerty|letmein|admin)$/i.test(password)) {
-        score = Math.min(score, 20);
-      }
-      return Math.round(score);
-    }
-
-    function strengthLabel(score) {
-      if (score < 35) return 'Weak';
-      if (score < 65) return 'Moderate';
-      return 'Strong';
-    }
-
-    function suggestImprovements(password) {
-      const suggestions = [];
-      if (password.length < 12) suggestions.push('Increase length to 12 or more characters.');
-      if (!/[A-Z]/.test(password)) suggestions.push('Add uppercase letters.');
-      if (!/[a-z]/.test(password)) suggestions.push('Add lowercase letters.');
-      if (!/[0-9]/.test(password)) suggestions.push('Add digits.');
-      if (!/[^A-Za-z0-9]/.test(password)) suggestions.push('Add symbols or punctuation.');
-      if (/^(password|123456|qwerty|letmein|admin)$/i.test(password)) suggestions.push('Avoid common passwords or simple dictionary words.');
-      if (/(.)\1{2,}/.test(password) || /(0123|1234|2345|3456|4567|5678|6789)/.test(password) || /qwerty|asdfgh|zxcvbn/i.test(password)) {
-        suggestions.push('Avoid repeated characters, numeric sequences, and keyboard patterns.');
-      }
-      return suggestions;
-    }
-
-    function updateMeter() {
-      const value = passwordInput.value.trim();
-      const score = complexityScore(value);
-      const label = strengthLabel(score);
-      strengthBar.style.width = `${Math.max(score, 5)}%`;
-      strengthBar.className = `strength-bar ${label.toLowerCase()}`;
-      strengthText.textContent = value ? `${label} · ${score}%` : 'Start typing to see strength.';
-      const suggestions = value ? suggestImprovements(value) : [];
-      suggestionsList.innerHTML = suggestions.length ? `<ul>${suggestions.map(s => `<li>${s}</li>`).join('')}</ul>` : '<p class="suggestion-strong">Good start! Generate or refine your password for stronger protection.</p>';
-    }
 
     function updateLengthLabel() {
       if (passphraseToggle.checked) {
@@ -176,12 +82,7 @@
     }
 
     passphraseToggle.addEventListener('change', updateLengthLabel);
-    passwordInput.addEventListener('input', updateMeter);
     copyGeneratedButton.addEventListener('click', () => copyPassword(generatedPasswordInput, copyGeneratedButton));
-    copyPreviewButton.addEventListener('click', () => copyPassword(passwordInput, copyPreviewButton));
-    window.addEventListener('DOMContentLoaded', () => {
-      updateLengthLabel();
-      updateMeter();
-    });
+    window.addEventListener('DOMContentLoaded', updateLengthLabel);
   </script>
 {% endblock %}
